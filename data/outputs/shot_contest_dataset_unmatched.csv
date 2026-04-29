@@ -1,0 +1,193 @@
+unmatched_type,game_file,game_id,opponent,period,shooter_id,shooter_name,release_frame,release_game_clock,release_shot_clock,contest_distance_ft,shot_contest_quality,pbp_shot_result,pbp_conclusion_game_clock,pbp_description
+tracking_only,nba_game_0022500062_processed.parquet,0022500062,Bucks,1,1628398,Kyle Kuzma,47788,4:31,18,5.603,37.79,NA,NA,NA
+tracking_only,nba_game_0022500062_processed.parquet,0022500062,Bucks,3,1631260,AJ Green,214047,10:01,9,3.616,67.34,NA,NA,NA
+tracking_only,nba_game_0022500062_processed.parquet,0022500062,Bucks,3,1626167,Myles Turner,219533,9:27,1.4,3.739,44.52,NA,NA,NA
+tracking_only,nba_game_0022500062_processed.parquet,0022500062,Bucks,4,1631157,Ryan Rollins,347170,6:34,22,6.79,56.24,NA,NA,NA
+pbp_only,nba_game_0022500062_processed.parquet,0022500062,Bucks,1,1631157,Ryan Rollins,NA,NA,NA,NA,NA,Missed,6:56,MISS R. Rollins 3PT
+pbp_only,nba_game_0022500062_processed.parquet,0022500062,Bucks,2,1626171,Bobby Portis,NA,NA,NA,NA,NA,Missed,10:11,MISS B. Portis 25' 3PT
+pbp_only,nba_game_0022500062_processed.parquet,0022500062,Bucks,2,1630175,Cole Anthony,NA,NA,NA,NA,NA,Missed,9:52,MISS C. Anthony 25' running pullup 3PT
+pbp_only,nba_game_0022500062_processed.parquet,0022500062,Bucks,2,1629018,Gary Trent Jr.,NA,NA,NA,NA,NA,Missed,5:38,MISS G. Trent Jr. 24' step back 3PT
+pbp_only,nba_game_0022500062_processed.parquet,0022500062,Bucks,2,1629018,Gary Trent Jr.,NA,NA,NA,NA,NA,Missed,1:15,MISS G. Trent Jr. 25' 3PT
+pbp_only,nba_game_0022500062_processed.parquet,0022500062,Bucks,3,1629018,Gary Trent Jr.,NA,NA,NA,NA,NA,Missed,10:47,MISS G. Trent Jr. 26' 3PT
+pbp_only,nba_game_0022500062_processed.parquet,0022500062,Bucks,4,1626171,Bobby Portis,NA,NA,NA,NA,NA,Missed,9:56,MISS B. Portis 25' pullup 3PT
+pbp_only,nba_game_0022500062_processed.parquet,0022500062,Bucks,4,1631157,Ryan Rollins,NA,NA,NA,NA,NA,Missed,6:28,MISS R. Rollins 28' pullup 3PT
+pbp_only,nba_game_0022500062_processed.parquet,0022500062,Bucks,4,1626167,Myles Turner,NA,NA,NA,NA,NA,Missed,5:58,MISS M. Turner 25' 3PT
+tracking_only,nba_game_0022500296_processed.parquet,0022500296,Pistons,2,202699,Tobias Harris,181498,3:21,13,6.196,23.95,NA,NA,NA
+pbp_only,nba_game_0022500296_processed.parquet,0022500296,Pistons,2,1629130,Duncan Robinson,NA,NA,NA,NA,NA,Missed,7:38,MISS D. Robinson 29' 3PT
+pbp_only,nba_game_0022500296_processed.parquet,0022500296,Pistons,3,202699,Tobias Harris,NA,NA,NA,NA,NA,Missed,10:58,MISS T. Harris 3PT
+pbp_only,nba_game_0022500296_processed.parquet,0022500296,Pistons,3,1629130,Duncan Robinson,NA,NA,NA,NA,NA,Missed,4:19,MISS D. Robinson 25' pullup 3PT
+pbp_only,nba_game_0022500296_processed.parquet,0022500296,Pistons,4,1630595,Cade Cunningham,NA,NA,NA,NA,NA,Missed,9:32,MISS C. Cunningham 26' step back 3PT
+tracking_only,nba_game_0022500313_processed.parquet,0022500313,Clippers,1,1627739,Kris Dunn,12881,9:05,20,6.682,15.43,NA,NA,NA
+pbp_only,nba_game_0022500313_processed.parquet,0022500313,Clippers,1,1642920,Kobe Sanders,NA,NA,NA,NA,NA,Missed,4:05,MISS K. Sanders 24' running 3PT - blocked
+pbp_only,nba_game_0022500313_processed.parquet,0022500313,Clippers,2,1641757,J. Miller,NA,NA,NA,NA,NA,Missed,10:22,MISS J. Miller 3PT - blocked
+pbp_only,nba_game_0022500313_processed.parquet,0022500313,Clippers,2,201935,James Harden,NA,NA,NA,NA,NA,Missed,6:07,MISS J. Harden 26' step back 3PT
+pbp_only,nba_game_0022500313_processed.parquet,0022500313,Clippers,2,1627739,Kris Dunn,NA,NA,NA,NA,NA,Missed,1:15,MISS K. Dunn 25' 3PT
+pbp_only,nba_game_0022500313_processed.parquet,0022500313,Clippers,2,1642920,Kobe Sanders,NA,NA,NA,NA,NA,Missed,0:06,MISS K. Sanders 3PT
+pbp_only,nba_game_0022500313_processed.parquet,0022500313,Clippers,3,101108,Chris Paul,NA,NA,NA,NA,NA,Missed,3:06,MISS C. Paul 26' pullup 3PT
+pbp_only,nba_game_0022500313_processed.parquet,0022500313,Clippers,3,1641738,Kobe Brown,NA,NA,NA,NA,NA,Missed,2:12,MISS K. Brown 24' 3PT
+pbp_only,nba_game_0022500313_processed.parquet,0022500313,Clippers,3,202695,Kawhi Leonard,NA,NA,NA,NA,NA,Missed,0:02,MISS K. Leonard 28' pullup 3PT
+tracking_only,nba_game_0022500332_processed.parquet,0022500332,Mavericks,1,1642843,Cooper Flagg,20516,8:58,18,10.008,24.43,NA,NA,NA
+tracking_only,nba_game_0022500332_processed.parquet,0022500332,Mavericks,1,202691,Klay Thompson,89120,1:39,1.1,5.806,55.08,NA,NA,NA
+tracking_only,nba_game_0022500332_processed.parquet,0022500332,Mavericks,3,1642948,Ryan Nembhard,224484,10:25,14,2.548,61.59,NA,NA,NA
+tracking_only,nba_game_0022500332_processed.parquet,0022500332,Mavericks,4,1642948,Ryan Nembhard,406411,25.1,2.5,6.103,44.24,NA,NA,NA
+pbp_only,nba_game_0022500332_processed.parquet,0022500332,Mavericks,1,203076,Anthony Davis,NA,NA,NA,NA,NA,Missed,9:46,MISS A. Davis 26' 3PT
+pbp_only,nba_game_0022500332_processed.parquet,0022500332,Mavericks,1,202691,Klay Thompson,NA,NA,NA,NA,NA,Missed,7:24,MISS K. Thompson 25' 3PT
+pbp_only,nba_game_0022500332_processed.parquet,0022500332,Mavericks,1,1626156,D'Angelo Russell,NA,NA,NA,NA,NA,Missed,0:26,MISS D. Russell 28' pullup 3PT
+pbp_only,nba_game_0022500332_processed.parquet,0022500332,Mavericks,2,202691,Klay Thompson,NA,NA,NA,NA,NA,Missed,0:46,MISS K. Thompson 25' 3PT
+pbp_only,nba_game_0022500332_processed.parquet,0022500332,Mavericks,3,202691,Klay Thompson,NA,NA,NA,NA,NA,Missed,7:03,MISS K. Thompson 26' running 3PT
+pbp_only,nba_game_0022500332_processed.parquet,0022500332,Mavericks,3,1631108,Max Christie,NA,NA,NA,NA,NA,Missed,5:55,MISS M. Christie 24' 3PT
+pbp_only,nba_game_0022500332_processed.parquet,0022500332,Mavericks,3,202691,Klay Thompson,NA,NA,NA,NA,NA,Missed,1:54,MISS K. Thompson 26' 3PT
+pbp_only,nba_game_0022500332_processed.parquet,0022500332,Mavericks,4,203076,Anthony Davis,NA,NA,NA,NA,NA,Missed,8:32,MISS A. Davis 26' 3PT
+tracking_only,nba_game_0022500513_processed.parquet,0022500513,Timberwolves,2,201144,Mike Conley,192363,2:09,21,5.337,31.32,NA,NA,NA
+tracking_only,nba_game_0022500513_processed.parquet,0022500513,Timberwolves,3,1628978,Donte DiVincenzo,281082,2:53,23,18.047,0.83,NA,NA,NA
+tracking_only,nba_game_0022500513_processed.parquet,0022500513,Timberwolves,4,1642265,Rob Dillingham,416113,40.2,21,4.523,48.69,NA,NA,NA
+pbp_only,nba_game_0022500513_processed.parquet,0022500513,Timberwolves,1,1630162,Anthony Edwards,NA,NA,NA,NA,NA,Missed,6:00,MISS A. Edwards 24' pullup 3PT
+pbp_only,nba_game_0022500513_processed.parquet,0022500513,Timberwolves,1,201144,Mike Conley,NA,NA,NA,NA,NA,Missed,3:31,MISS M. Conley step back 3PT
+pbp_only,nba_game_0022500513_processed.parquet,0022500513,Timberwolves,1,1629675,Naz Reid,NA,NA,NA,NA,NA,Missed,0:58,MISS N. Reid 25' 3PT
+pbp_only,nba_game_0022500513_processed.parquet,0022500513,Timberwolves,2,201144,Mike Conley,NA,NA,NA,NA,NA,Missed,1:29,MISS M. Conley 24' 3PT
+pbp_only,nba_game_0022500513_processed.parquet,0022500513,Timberwolves,4,1630183,Jaden McDaniels,NA,NA,NA,NA,NA,Missed,9:36,MISS J. McDaniels 28' 3PT
+pbp_only,nba_game_0022500513_processed.parquet,0022500513,Timberwolves,4,1628978,Donte DiVincenzo,NA,NA,NA,NA,NA,Missed,9:08,MISS D. DiVincenzo 25' step back 3PT
+pbp_only,nba_game_0022500513_processed.parquet,0022500513,Timberwolves,4,204060,J. Ingles,NA,NA,NA,NA,NA,Missed,3:49,MISS J. Ingles 25' 3PT
+pbp_only,nba_game_0022500513_processed.parquet,0022500513,Timberwolves,4,1630548,J. Juzang,NA,NA,NA,NA,NA,Missed,1:28,MISS J. Juzang 25' 3PT
+pbp_only,nba_game_0022500513_processed.parquet,0022500513,Timberwolves,4,1630548,J. Juzang,NA,NA,NA,NA,NA,Missed,1:17,MISS J. Juzang 3PT
+tracking_only,nba_game_0022500553_processed.parquet,0022500553,Thunder,2,1630598,Aaron Wiggins,124703,9:47,12,9.185,21.88,NA,NA,NA
+tracking_only,nba_game_0022500553_processed.parquet,0022500553,Thunder,2,1642349,Ajay Mitchell,202593,0.6,NA,9.678,9.38,NA,NA,NA
+tracking_only,nba_game_0022500553_processed.parquet,0022500553,Thunder,3,1628983,Shai Gilgeous-Alexander,269418,4:58,15,4.064,23.62,NA,NA,NA
+pbp_only,nba_game_0022500553_processed.parquet,0022500553,Thunder,3,1628983,Shai Gilgeous-Alexander,NA,NA,NA,NA,NA,Missed,11:14,MISS S. Gilgeous-Alexander 25' pullup 3PT
+pbp_only,nba_game_0022500553_processed.parquet,0022500553,Thunder,3,1641717,Cason Wallace,NA,NA,NA,NA,NA,Missed,9:46,MISS C. Wallace 3PT
+pbp_only,nba_game_0022500553_processed.parquet,0022500553,Thunder,3,1642349,Ajay Mitchell,NA,NA,NA,NA,NA,Missed,2:14,MISS A. Mitchell 3PT
+pbp_only,nba_game_0022500553_processed.parquet,0022500553,Thunder,4,1630198,Isaiah Joe,NA,NA,NA,NA,NA,Missed,10:23,MISS I. Joe 26' 3PT
+pbp_only,nba_game_0022500553_processed.parquet,0022500553,Thunder,4,1630598,Aaron Wiggins,NA,NA,NA,NA,NA,Missed,5:54,MISS A. Wiggins 26' 3PT
+tracking_only,nba_game_0022500564_processed.parquet,0022500564,Suns,1,1631221,Collin Gillespie,26617,6:52,14,15.715,4.95,NA,NA,NA
+tracking_only,nba_game_0022500564_processed.parquet,0022500564,Suns,1,1626164,Devin Booker,47456,4:22,18,5.57,21.06,NA,NA,NA
+tracking_only,nba_game_0022500564_processed.parquet,0022500564,Suns,1,1642346,Ryan Dunn,75069,1:43,13,15.186,17.09,NA,NA,NA
+tracking_only,nba_game_0022500564_processed.parquet,0022500564,Suns,4,1631221,Collin Gillespie,339820,10:43,10,8.624,45.59,NA,NA,NA
+pbp_only,nba_game_0022500564_processed.parquet,0022500564,Suns,1,1628415,Dillon Brooks,NA,NA,NA,NA,NA,Missed,4:39,MISS D. Brooks 3PT
+pbp_only,nba_game_0022500564_processed.parquet,0022500564,Suns,1,1642346,Ryan Dunn,NA,NA,NA,NA,NA,Missed,1:36,MISS R. Dunn 3PT
+pbp_only,nba_game_0022500564_processed.parquet,0022500564,Suns,2,1628960,Grayson Allen,NA,NA,NA,NA,NA,Missed,11:09,MISS G. Allen 27' pullup 3PT
+pbp_only,nba_game_0022500564_processed.parquet,0022500564,Suns,2,1631221,Collin Gillespie,NA,NA,NA,NA,NA,Missed,9:20,MISS C. Gillespie 25' 3PT
+pbp_only,nba_game_0022500564_processed.parquet,0022500564,Suns,2,1626220,Royce O'Neale,NA,NA,NA,NA,NA,Missed,8:28,MISS R. O'Neale 25' 3PT
+pbp_only,nba_game_0022500564_processed.parquet,0022500564,Suns,2,1628415,Dillon Brooks,NA,NA,NA,NA,NA,Missed,3:06,MISS D. Brooks 26' pullup 3PT
+pbp_only,nba_game_0022500564_processed.parquet,0022500564,Suns,2,1628415,Dillon Brooks,NA,NA,NA,NA,NA,Missed,1:02,MISS D. Brooks 24' 3PT
+pbp_only,nba_game_0022500564_processed.parquet,0022500564,Suns,2,1628415,Dillon Brooks,NA,NA,NA,NA,NA,Missed,0:00,MISS D. Brooks 26' 3PT
+pbp_only,nba_game_0022500564_processed.parquet,0022500564,Suns,3,1628415,Dillon Brooks,NA,NA,NA,NA,NA,Missed,10:34,MISS D. Brooks 25' running pullup 3PT
+pbp_only,nba_game_0022500564_processed.parquet,0022500564,Suns,3,1628960,Grayson Allen,NA,NA,NA,NA,NA,Missed,0:01,MISS G. Allen 24' step back 3PT
+pbp_only,nba_game_0022500564_processed.parquet,0022500564,Suns,4,1630692,Jordan Goodwin,NA,NA,NA,NA,NA,Missed,10:48,MISS J. Goodwin 3PT
+pbp_only,nba_game_0022500564_processed.parquet,0022500564,Suns,4,1628960,Grayson Allen,NA,NA,NA,NA,NA,Missed,10:30,MISS G. Allen 31' 3PT
+pbp_only,nba_game_0022500564_processed.parquet,0022500564,Suns,4,1642346,Ryan Dunn,NA,NA,NA,NA,NA,Made,9:28,R. Dunn 3PT  (3 PTS) (R. O'Neale 2 AST)
+pbp_only,nba_game_0022500564_processed.parquet,0022500564,Suns,4,1631221,Collin Gillespie,NA,NA,NA,NA,NA,Missed,7:59,MISS C. Gillespie 24' pullup 3PT
+pbp_only,nba_game_0022500564_processed.parquet,0022500564,Suns,4,1628960,Grayson Allen,NA,NA,NA,NA,NA,Missed,6:08,MISS G. Allen 29' pullup 3PT
+pbp_only,nba_game_0022500564_processed.parquet,0022500564,Suns,4,1626220,Royce O'Neale,NA,NA,NA,NA,NA,Missed,0:01,MISS R. O'Neale 31' pullup 3PT
+tracking_only,nba_game_0022500864_processed.parquet,0022500864,Rockets,1,1642263,Reed Sheppard,7281,10:15,21,6.546,46.57,NA,NA,NA
+tracking_only,nba_game_0022500864_processed.parquet,0022500864,Rockets,1,1642263,Reed Sheppard,29997,7:12,9,7.049,37.14,NA,NA,NA
+tracking_only,nba_game_0022500864_processed.parquet,0022500864,Rockets,2,201142,Kevin Durant,201575,1:44,4.3,4.872,52.9,NA,NA,NA
+pbp_only,nba_game_0022500864_processed.parquet,0022500864,Rockets,1,1642263,Reed Sheppard,NA,NA,NA,NA,NA,Made,10:08,R. Sheppard 25' 3PT running (3 PTS) (K. Durant 1 AST)
+pbp_only,nba_game_0022500864_processed.parquet,0022500864,Rockets,2,1628988,Aaron Holiday,NA,NA,NA,NA,NA,Missed,10:36,MISS A. Holiday 24' 3PT
+pbp_only,nba_game_0022500864_processed.parquet,0022500864,Rockets,2,1628988,Aaron Holiday,NA,NA,NA,NA,NA,Missed,9:13,MISS A. Holiday 24' 3PT
+pbp_only,nba_game_0022500864_processed.parquet,0022500864,Rockets,2,1627827,Dorian Finney-Smith,NA,NA,NA,NA,NA,Missed,8:07,MISS D. Finney-Smith 26' 3PT - blocked
+pbp_only,nba_game_0022500864_processed.parquet,0022500864,Rockets,2,201145,J. Green,NA,NA,NA,NA,NA,Missed,3:39,MISS J. Green 3PT
+pbp_only,nba_game_0022500864_processed.parquet,0022500864,Rockets,3,1642263,Reed Sheppard,NA,NA,NA,NA,NA,Missed,11:03,MISS R. Sheppard 3PT
+pbp_only,nba_game_0022500864_processed.parquet,0022500864,Rockets,4,201145,J. Green,NA,NA,NA,NA,NA,Missed,10:35,MISS J. Green 26' 3PT
+pbp_only,nba_game_0022500864_processed.parquet,0022500864,Rockets,4,1642263,Reed Sheppard,NA,NA,NA,NA,NA,Missed,9:50,MISS R. Sheppard 28' 3PT
+pbp_only,nba_game_0022500864_processed.parquet,0022500864,Rockets,4,201142,Kevin Durant,NA,NA,NA,NA,NA,Missed,6:16,MISS K. Durant 26' pullup 3PT
+pbp_only,nba_game_0022500864_processed.parquet,0022500864,Rockets,4,1631106,Tari Eason,NA,NA,NA,NA,NA,Missed,5:43,MISS T. Eason 3PT
+pbp_only,nba_game_0022500864_processed.parquet,0022500864,Rockets,4,201142,Kevin Durant,NA,NA,NA,NA,NA,Missed,2:31,MISS K. Durant 25' 3PT
+pbp_only,nba_game_0022500864_processed.parquet,0022500864,Rockets,4,1642263,Reed Sheppard,NA,NA,NA,NA,NA,Missed,2:06,MISS R. Sheppard 25' 3PT
+pbp_only,nba_game_0022500864_processed.parquet,0022500864,Rockets,4,201142,Kevin Durant,NA,NA,NA,NA,NA,Missed,1:53,MISS K. Durant 25' step back 3PT
+pbp_only,nba_game_0022500864_processed.parquet,0022500864,Rockets,4,1642263,Reed Sheppard,NA,NA,NA,NA,NA,Missed,0:57,MISS R. Sheppard 26' 3PT
+pbp_only,nba_game_0022500864_processed.parquet,0022500864,Rockets,4,1631106,Tari Eason,NA,NA,NA,NA,NA,Missed,0:53,MISS T. Eason 25' 3PT
+tracking_only,nba_game_0022500886_processed.parquet,0022500886,Nets,1,1642874,Danny Wolf,62747,3:03,17,5.041,32.36,NA,NA,NA
+tracking_only,nba_game_0022500886_processed.parquet,0022500886,Nets,2,1630533,Ziaire Williams,103277,10:34,18,6.402,57.59,NA,NA,NA
+tracking_only,nba_game_0022500886_processed.parquet,0022500886,Nets,2,1629008,Michael Porter Jr.,151361,6:18,14,3.395,68.12,NA,NA,NA
+pbp_only,nba_game_0022500886_processed.parquet,0022500886,Nets,2,1629008,Michael Porter Jr.,NA,NA,NA,NA,NA,Missed,3:20,MISS M. Porter Jr. 24' 3PT
+pbp_only,nba_game_0022500886_processed.parquet,0022500886,Nets,2,1629008,Michael Porter Jr.,NA,NA,NA,NA,NA,Missed,2:17,MISS M. Porter Jr. 25' 3PT
+pbp_only,nba_game_0022500886_processed.parquet,0022500886,Nets,3,1629008,Michael Porter Jr.,NA,NA,NA,NA,NA,Missed,9:43,MISS M. Porter Jr. 24' 3PT
+pbp_only,nba_game_0022500886_processed.parquet,0022500886,Nets,3,1642849,Nolan Traore,NA,NA,NA,NA,NA,Missed,7:07,MISS N. Traore 24' 3PT
+pbp_only,nba_game_0022500886_processed.parquet,0022500886,Nets,3,1642874,Danny Wolf,NA,NA,NA,NA,NA,Missed,5:14,MISS D. Wolf 3PT
+pbp_only,nba_game_0022500886_processed.parquet,0022500886,Nets,3,1642874,Danny Wolf,NA,NA,NA,NA,NA,Missed,4:00,MISS D. Wolf 26' 3PT
+pbp_only,nba_game_0022500886_processed.parquet,0022500886,Nets,3,1630533,Ziaire Williams,NA,NA,NA,NA,NA,Missed,0:01,MISS Z. Williams 25' 3PT
+pbp_only,nba_game_0022500886_processed.parquet,0022500886,Nets,4,1631169,Josh Minott,NA,NA,NA,NA,NA,Missed,9:56,MISS J. Minott 25' 3PT
+pbp_only,nba_game_0022500886_processed.parquet,0022500886,Nets,4,1629008,Michael Porter Jr.,NA,NA,NA,NA,NA,Missed,7:12,MISS M. Porter Jr. 24' 3PT
+pbp_only,nba_game_0022500886_processed.parquet,0022500886,Nets,4,1630534,O. Agbaji,NA,NA,NA,NA,NA,Missed,2:38,MISS O. Agbaji 3PT
+tracking_only,nba_game_0022500901_processed.parquet,0022500901,Nets,3,1629008,Michael Porter Jr.,218388,9:34,16,1.871,73.45,NA,NA,NA
+pbp_only,nba_game_0022500901_processed.parquet,0022500901,Nets,3,1629008,Michael Porter Jr.,NA,NA,NA,NA,NA,Missed,10:30,MISS M. Porter Jr. 25' running pullup 3PT
+pbp_only,nba_game_0022500901_processed.parquet,0022500901,Nets,4,1642849,Nolan Traore,NA,NA,NA,NA,NA,Missed,9:08,MISS N. Traore 27' 3PT
+pbp_only,nba_game_0022500901_processed.parquet,0022500901,Nets,4,1629008,Michael Porter Jr.,NA,NA,NA,NA,NA,Missed,7:19,MISS M. Porter Jr. 24' pullup 3PT
+pbp_only,nba_game_0022500901_processed.parquet,0022500901,Nets,4,1630533,Ziaire Williams,NA,NA,NA,NA,NA,Made,7:05,Z. Williams 3PT  (12 PTS) (N. Clowney 4 AST)
+pbp_only,nba_game_0022500901_processed.parquet,0022500901,Nets,4,1641730,Noah Clowney,NA,NA,NA,NA,NA,Missed,2:48,MISS N. Clowney 28' 3PT
+pbp_only,nba_game_0022500901_processed.parquet,0022500901,Nets,4,1629008,Michael Porter Jr.,NA,NA,NA,NA,NA,Missed,2:41,MISS M. Porter Jr. 3PT
+pbp_only,nba_game_0022500901_processed.parquet,0022500901,Nets,4,1630534,Ochai Agbaji,NA,NA,NA,NA,NA,Missed,0:52,MISS O. Agbaji 26' 3PT
+tracking_only,nba_game_0022501055_processed.parquet,0022501055,Cavaliers,1,1628378,Donovan Mitchell,83885,1:15,5,11.531,7.1,NA,NA,NA
+tracking_only,nba_game_0022501055_processed.parquet,0022501055,Cavaliers,2,1631165,Keon Ellis,191051,1:35,15,6.862,55.98,NA,NA,NA
+tracking_only,nba_game_0022501055_processed.parquet,0022501055,Cavaliers,3,203471,Dennis Schroder,270525,5:38,23,8.392,12.54,NA,NA,NA
+tracking_only,nba_game_0022501055_processed.parquet,0022501055,Cavaliers,4,201935,James Harden,356971,7:58,14,6.151,58.47,NA,NA,NA
+pbp_only,nba_game_0022501055_processed.parquet,0022501055,Cavaliers,1,1630241,Sam Merrill,NA,NA,NA,NA,NA,Missed,10:28,MISS S. Merrill 25' 3PT
+pbp_only,nba_game_0022501055_processed.parquet,0022501055,Cavaliers,1,1628378,Donovan Mitchell,NA,NA,NA,NA,NA,Missed,9:09,MISS D. Mitchell 30' pullup 3PT
+pbp_only,nba_game_0022501055_processed.parquet,0022501055,Cavaliers,1,1628418,T. Bryant,NA,NA,NA,NA,NA,Missed,2:48,MISS T. Bryant 25' 3PT
+pbp_only,nba_game_0022501055_processed.parquet,0022501055,Cavaliers,2,1630241,Sam Merrill,NA,NA,NA,NA,NA,Missed,6:47,MISS S. Merrill 27' 3PT
+pbp_only,nba_game_0022501055_processed.parquet,0022501055,Cavaliers,2,1630241,Sam Merrill,NA,NA,NA,NA,NA,Missed,5:08,MISS S. Merrill 26' step back 3PT
+pbp_only,nba_game_0022501055_processed.parquet,0022501055,Cavaliers,3,1630241,Sam Merrill,NA,NA,NA,NA,NA,Made,8:23,S. Merrill 24' 3PT  (13 PTS) (D. Mitchell 3 AST)
+pbp_only,nba_game_0022501055_processed.parquet,0022501055,Cavaliers,3,201935,James Harden,NA,NA,NA,NA,NA,Missed,7:43,MISS J. Harden 24' running 3PT
+pbp_only,nba_game_0022501055_processed.parquet,0022501055,Cavaliers,3,1628378,Donovan Mitchell,NA,NA,NA,NA,NA,Missed,3:25,MISS D. Mitchell 3PT
+pbp_only,nba_game_0022501055_processed.parquet,0022501055,Cavaliers,4,1628378,Donovan Mitchell,NA,NA,NA,NA,NA,Missed,11:00,MISS D. Mitchell 24' step back 3PT
+pbp_only,nba_game_0022501055_processed.parquet,0022501055,Cavaliers,4,203471,Dennis Schroder,NA,NA,NA,NA,NA,Missed,6:46,MISS D. Schröder 25' 3PT
+pbp_only,nba_game_0022501055_processed.parquet,0022501055,Cavaliers,4,1631165,Keon Ellis,NA,NA,NA,NA,NA,Missed,4:38,MISS K. Ellis 24' 3PT
+pbp_only,nba_game_0022501055_processed.parquet,0022501055,Cavaliers,4,201935,James Harden,NA,NA,NA,NA,NA,Missed,3:24,MISS J. Harden 25' 3PT
+tracking_only,nba_game_0022501083_processed.parquet,0022501083,Pacers,1,1629614,Andrew Nembhard,3867,10:59,18,5.166,37.98,NA,NA,NA
+tracking_only,nba_game_0022501083_processed.parquet,0022501083,Pacers,2,1629614,Andrew Nembhard,198419,1:51,19,5.718,31.7,NA,NA,NA
+tracking_only,nba_game_0022501083_processed.parquet,0022501083,Pacers,3,1627783,Pascal Siakam,222913,10:21,5,5.086,37.66,NA,NA,NA
+tracking_only,nba_game_0022501083_processed.parquet,0022501083,Pacers,3,1629614,Andrew Nembhard,266144,5:04,10,4.402,54.23,NA,NA,NA
+tracking_only,nba_game_0022501083_processed.parquet,0022501083,Pacers,4,1641771,Jalen Slawson,346876,6:25,17,10.95,30.97,NA,NA,NA
+tracking_only,nba_game_0022501083_processed.parquet,0022501083,Pacers,4,1630643,Jay Huff,376652,3:24,10,7.846,52.54,NA,NA,NA
+pbp_only,nba_game_0022501083_processed.parquet,0022501083,Pacers,1,1627783,Pascal Siakam,NA,NA,NA,NA,NA,Missed,11:39,MISS P. Siakam 24' 3PT
+pbp_only,nba_game_0022501083_processed.parquet,0022501083,Pacers,1,1641767,Ben Sheppard,NA,NA,NA,NA,NA,Missed,1:52,MISS B. Sheppard 24' 3PT
+pbp_only,nba_game_0022501083_processed.parquet,0022501083,Pacers,3,1627783,Pascal Siakam,NA,NA,NA,NA,NA,Missed,8:38,MISS P. Siakam 25' 3PT
+pbp_only,nba_game_0022501083_processed.parquet,0022501083,Pacers,4,1630643,Jay Huff,NA,NA,NA,NA,NA,Missed,10:48,MISS J. Huff 25' 3PT
+pbp_only,nba_game_0022501083_processed.parquet,0022501083,Pacers,4,1641738,Kobe Brown,NA,NA,NA,NA,NA,Missed,10:27,MISS K. Brown 26' 3PT
+pbp_only,nba_game_0022501083_processed.parquet,0022501083,Pacers,4,1641738,Kobe Brown,NA,NA,NA,NA,NA,Missed,3:54,MISS K. Brown 3PT
+pbp_only,nba_game_0022501083_processed.parquet,0022501083,Pacers,4,1627783,Pascal Siakam,NA,NA,NA,NA,NA,Missed,1:00,MISS P. Siakam 3PT
+tracking_only,nba_game_0022501091_processed.parquet,0022501091,76ers,1,202331,Paul George,27275,7:06,20,10.1,15.0,NA,NA,NA
+tracking_only,nba_game_0022501091_processed.parquet,0022501091,76ers,1,202331,Paul George,32789,5:35,19,8.576,13.51,NA,NA,NA
+tracking_only,nba_game_0022501091_processed.parquet,0022501091,76ers,1,1630178,Tyrese Maxey,82287,1:37,21,11.818,4.36,NA,NA,NA
+tracking_only,nba_game_0022501091_processed.parquet,0022501091,76ers,2,1630178,Tyrese Maxey,111051,11:48,12,6.233,54.52,NA,NA,NA
+tracking_only,nba_game_0022501091_processed.parquet,0022501091,76ers,2,1630178,Tyrese Maxey,117022,10:08,16,9.171,13.28,NA,NA,NA
+tracking_only,nba_game_0022501091_processed.parquet,0022501091,76ers,4,1630178,Tyrese Maxey,423835,4:09,11,7.781,32.89,NA,NA,NA
+tracking_only,nba_game_0022501091_processed.parquet,0022501091,76ers,4,1642845,VJ Edgecombe,451444,55.6,17,7.533,33.78,NA,NA,NA
+pbp_only,nba_game_0022501091_processed.parquet,0022501091,76ers,1,202331,Paul George,NA,NA,NA,NA,NA,Missed,10:23,MISS P. George 3PT
+pbp_only,nba_game_0022501091_processed.parquet,0022501091,76ers,1,1642845,VJ Edgecombe,NA,NA,NA,NA,NA,Missed,4:59,MISS V. Edgecombe 26' 3PT
+pbp_only,nba_game_0022501091_processed.parquet,0022501091,76ers,3,203954,Joel Embiid,NA,NA,NA,NA,NA,Missed,10:45,MISS J. Embiid 35' 3PT
+pbp_only,nba_game_0022501091_processed.parquet,0022501091,76ers,3,202331,Paul George,NA,NA,NA,NA,NA,Missed,8:39,MISS P. George 27' 3PT
+pbp_only,nba_game_0022501091_processed.parquet,0022501091,76ers,3,1626162,Kelly Oubre Jr.,NA,NA,NA,NA,NA,Missed,4:51,MISS K. Oubre Jr. 26' 3PT
+pbp_only,nba_game_0022501091_processed.parquet,0022501091,76ers,3,1629656,Quentin Grimes,NA,NA,NA,NA,NA,Missed,0:00,MISS Q. Grimes 37' pullup 3PT
+pbp_only,nba_game_0022501091_processed.parquet,0022501091,76ers,4,202331,Paul George,NA,NA,NA,NA,NA,Missed,11:13,MISS P. George 3PT
+pbp_only,nba_game_0022501091_processed.parquet,0022501091,76ers,4,1629656,Quentin Grimes,NA,NA,NA,NA,NA,Missed,9:14,MISS Q. Grimes 24' 3PT
+pbp_only,nba_game_0022501091_processed.parquet,0022501091,76ers,4,1630178,Tyrese Maxey,NA,NA,NA,NA,NA,Missed,2:14,MISS T. Maxey 26' pullup 3PT
+pbp_only,nba_game_0022501091_processed.parquet,0022501091,76ers,4,202331,Paul George,NA,NA,NA,NA,NA,Missed,1:25,MISS P. George 3PT - blocked
+pbp_only,nba_game_0022501091_processed.parquet,0022501091,76ers,4,1630178,Tyrese Maxey,NA,NA,NA,NA,NA,Missed,0:20,MISS T. Maxey fadeaway 3PT
+pbp_only,nba_game_0022501091_processed.parquet,0022501091,76ers,4,203954,Joel Embiid,NA,NA,NA,NA,NA,Missed,0:15,MISS J. Embiid 3PT
+tracking_only,nba_game_0022501106_processed.parquet,0022501106,Celtics,1,1630202,Payton Pritchard,62716,3:54,20,15.173,2.5,NA,NA,NA
+tracking_only,nba_game_0022501106_processed.parquet,0022501106,Celtics,2,1628401,Derrick White,112056,11:43,7,3.662,60.21,NA,NA,NA
+tracking_only,nba_game_0022501106_processed.parquet,0022501106,Celtics,2,1628401,Derrick White,201114,3.5,NA,13.592,5.03,NA,NA,NA
+pbp_only,nba_game_0022501106_processed.parquet,0022501106,Celtics,1,1628369,Jayson Tatum,NA,NA,NA,NA,NA,Missed,7:10,MISS J. Tatum 27' pullup 3PT
+pbp_only,nba_game_0022501106_processed.parquet,0022501106,Celtics,1,1628369,Jayson Tatum,NA,NA,NA,NA,NA,Missed,0:05,MISS J. Tatum 29' pullup 3PT
+pbp_only,nba_game_0022501106_processed.parquet,0022501106,Celtics,2,1627759,Jaylen Brown,NA,NA,NA,NA,NA,Missed,5:36,MISS J. Brown 26' step back 3PT
+pbp_only,nba_game_0022501106_processed.parquet,0022501106,Celtics,2,1630573,Sam Hauser,NA,NA,NA,NA,NA,Missed,4:57,MISS S. Hauser 27' 3PT - blocked
+pbp_only,nba_game_0022501106_processed.parquet,0022501106,Celtics,3,1628369,Jayson Tatum,NA,NA,NA,NA,NA,Missed,3:39,MISS J. Tatum 27' pullup 3PT
+pbp_only,nba_game_0022501106_processed.parquet,0022501106,Celtics,4,1628369,Jayson Tatum,NA,NA,NA,NA,NA,Missed,7:51,MISS J. Tatum 27' 3PT
+pbp_only,nba_game_0022501106_processed.parquet,0022501106,Celtics,4,1627759,Jaylen Brown,NA,NA,NA,NA,NA,Missed,4:08,MISS J. Brown 29' 3PT
+tracking_only,nba_game_0022501201_processed.parquet,0022501201,Magic,1,1630217,Desmond Bane,84011,2:21,15,8.968,10.85,NA,NA,NA
+tracking_only,nba_game_0022501201_processed.parquet,0022501201,Magic,1,1630217,Desmond Bane,91665,1:41,24,7.254,10.46,NA,NA,NA
+tracking_only,nba_game_0022501201_processed.parquet,0022501201,Magic,1,1629048,Goga Bitadze,93927,1:32,19,5.246,16.93,NA,NA,NA
+tracking_only,nba_game_0022501201_processed.parquet,0022501201,Magic,3,1628976,Wendell Carter Jr.,326888,2:47,18,5.74,55.21,NA,NA,NA
+pbp_only,nba_game_0022501201_processed.parquet,0022501201,Magic,1,1630591,Jalen Suggs,NA,NA,NA,NA,NA,Missed,8:38,MISS J. Suggs 24' 3PT
+pbp_only,nba_game_0022501201_processed.parquet,0022501201,Magic,1,1630217,Desmond Bane,NA,NA,NA,NA,NA,Missed,7:57,MISS D. Bane 25' pullup 3PT
+pbp_only,nba_game_0022501201_processed.parquet,0022501201,Magic,1,1630217,Desmond Bane,NA,NA,NA,NA,NA,Missed,0:00,MISS D. Bane 3PT
+pbp_only,nba_game_0022501201_processed.parquet,0022501201,Magic,2,1641710,Anthony Black,NA,NA,NA,NA,NA,Missed,6:39,MISS A. Black 25' running 3PT
+pbp_only,nba_game_0022501201_processed.parquet,0022501201,Magic,2,1630591,Jalen Suggs,NA,NA,NA,NA,NA,Missed,4:50,MISS J. Suggs 25' 3PT
+pbp_only,nba_game_0022501201_processed.parquet,0022501201,Magic,2,1630591,Jalen Suggs,NA,NA,NA,NA,NA,Missed,3:05,MISS J. Suggs 3PT
+pbp_only,nba_game_0022501201_processed.parquet,0022501201,Magic,2,1628976,Wendell Carter Jr.,NA,NA,NA,NA,NA,Missed,1:13,MISS W. Carter Jr. 3PT
+pbp_only,nba_game_0022501201_processed.parquet,0022501201,Magic,2,1631094,Paolo Banchero,NA,NA,NA,NA,NA,Missed,0:05,MISS P. Banchero 26' 3PT
+pbp_only,nba_game_0022501201_processed.parquet,0022501201,Magic,3,1630591,Jalen Suggs,NA,NA,NA,NA,NA,Missed,5:06,MISS J. Suggs 25' pullup 3PT
+pbp_only,nba_game_0022501201_processed.parquet,0022501201,Magic,3,1641783,Tristan da Silva,NA,NA,NA,NA,NA,Missed,4:40,MISS T. da Silva 3PT
+pbp_only,nba_game_0022501201_processed.parquet,0022501201,Magic,3,1628976,Wendell Carter Jr.,NA,NA,NA,NA,NA,Made,2:41,W. Carter Jr. 3PT running (12 PTS) (T. da Silva 1 AST)
+pbp_only,nba_game_0022501201_processed.parquet,0022501201,Magic,4,1631094,Paolo Banchero,NA,NA,NA,NA,NA,Missed,1:44,MISS P. Banchero 28' pullup 3PT
