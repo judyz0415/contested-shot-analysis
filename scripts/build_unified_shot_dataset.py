@@ -26,6 +26,15 @@ One row per opponent 3-point attempt. Columns:
     pbp_shot_result, pbp_conclusion_game_clock, pbp_description
     (all three are "NA" when no PBP event matches)
 
+  QA filters  (automatic tags — tune via CLI constants)
+    pbp_rescued — secondary pass anchored on PBP resolution clock + shooter
+    analysis_eligible — no if missing PBP, long-range heave, or low shot clock
+    exclusion_reason — machine-readable codes (see HEAVE_AUDIT_REASONS subset)
+    suspected_low_arc_or_lob — low apex_height heuristic (possible lob mis-tag)
+
+Extras:
+    <output>_excluded_heaves.csv lists rows flagged by heave / desperation rules.
+
 Usage:
     python build_unified_shot_dataset.py \\
         --input-dir /path/to/onedrive/miami_heat_2025 \\
@@ -43,7 +52,7 @@ import re
 import sys
 import time
 import urllib.request
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 LOCAL_SITE = os.path.join(os.getcwd(), ".python_packages")
 if os.path.isdir(LOCAL_SITE):
@@ -65,6 +74,21 @@ RELEASE_Z_THRESHOLD = 90.0                  # ball must cross this height (inche
 APEX_SEARCH_FRAMES = 120                    # scan up to ~2 s after release for arc apex
 PBP_MATCH_WINDOW_SEC = 5.0                  # search up to 5 s after release in PBP
 PBP_CLOCK_BUFFER_SEC = 1.0                  # allow 1 s before release (clock sync tolerance)
+
+# PBP-only rescue: PBP clock is resolution time; release is ~0.9–2.7 s earlier on remaining clock.
+PBP_RESCUE_LAG_MIN_SEC = 0.9
+PBP_RESCUE_LAG_MAX_SEC = 2.8
+PBP_RESCUE_PREFERRED_LAG_SEC = 1.55
+RELEASE_Z_THRESHOLD_RELAXED = 78.0            # softer crossing for flat / airball releases
+RESCUE_RIM_APPROACH_MAX_IN = 38.0           # inches; airballs may not pass 18-in rim proximity check
+
+# Heave / garbage-shot filters (release-time shot clock & shooter distance).
+HEAVE_MIN_SHOOTER_DIST_FROM_RIM_IN = 42.0 * 12.0   # default ≥42 ft from rim (~half-court-ish heaves)
+MIN_SHOT_CLOCK_FOR_ANALYSIS = 1.0                  # exclude if shot clock strictly below this at release
+DESPERATE_SHOT_CLOCK_SEC = 0.8                     # always exclude at or below this (overlaps rule above)
+
+# Heuristic flag when apex never reaches typical jumper height — possible lob / mis-tagged pass.
+LOW_ARC_APEX_Z_INCHES = 158.0
 
 MIAMI_TEAM_ID = 1610612748
 PBP_URL = "https://cdn.nba.com/static/json/liveData/playbyplay/playbyplay_{game_id}.json"
@@ -92,6 +116,11 @@ FIELDNAMES = [
     "contest_angle_deg", "hand_up_in", "shot_contest_quality",
     # PBP outcome
     "pbp_shot_result", "pbp_conclusion_game_clock", "pbp_description",
+    # QA / filters
+    "pbp_rescued",              # yes = recovered from pbp_only via clock-targeted search
+    "analysis_eligible",        # yes if row should enter outcome+contest modeling
+    "exclusion_reason",         # semicolon-separated codes when not eligible
+    "suspected_low_arc_or_lob", # yes if apex height is unusually low for a jumper
 ]
 
 
@@ -310,12 +339,368 @@ def _contest_quality(dist_ft: float, speed_ft_s: float, angle_deg: float, hand_i
     ), 2)
 
 
+def _release_geometry_ok(i: int, ball_z: np.ndarray, z_thresh: float) -> bool:
+    """Upward crossing of z_thresh at i with continuation upward (+2 frames)."""
+    return bool(
+        ball_z[i - 1] < z_thresh <= ball_z[i]
+        and ball_z[i + 2] > ball_z[i]
+    )
+
+
+def _parse_shot_clock_seconds(val) -> float:
+    """Shot clock remainder in seconds from parquet string ('18', '0.9', '1:03' rare)."""
+    if val is None:
+        return float("nan")
+    s_raw = _safe_clock_str(val)
+    if s_raw == NA:
+        return float("nan")
+    sec = _parquet_clock_to_sec(s_raw)
+    return sec
+
+
+def _finalize_row_analysis_columns(
+    row: dict,
+    *,
+    heave_min_dist_from_rim_in: float,
+    min_shot_clock: float,
+    desperate_shot_clock: float,
+) -> None:
+    """Populate pbp_rescued / analysis eligibility / heuristic lob flag."""
+    if row.get("pbp_rescued") != "yes":
+        row["pbp_rescued"] = "no"
+
+    reasons: List[str] = []
+    if row.get("pbp_shot_result") == NA:
+        reasons.append("no_pbp_match")
+
+    sc = _parse_shot_clock_seconds(row.get("release_shot_clock"))
+    if not math.isnan(sc):
+        # Strict '< 1 s' excludes everything below 1.00 (includes 0.9, 0.8, …).
+        if sc + 1e-9 < min_shot_clock:
+            reasons.append("shot_clock_below_1s")
+        if sc <= desperate_shot_clock + 1e-9:
+            reasons.append("desperate_shot_clock_le_0p8")
+
+    try:
+        dist_in = float(row["shooter_dist_to_rim_in"])
+        if dist_in >= heave_min_dist_from_rim_in - 1e-9:
+            reasons.append("heave_long_distance")
+    except (TypeError, ValueError, KeyError):
+        pass
+
+    desc = (row.get("pbp_description") or "").lower()
+    if "heave" in desc:
+        reasons.append("pbp_keyword_heave")
+
+    row["analysis_eligible"] = "no" if reasons else "yes"
+    row["exclusion_reason"] = ";".join(reasons) if reasons else ""
+
+    row["suspected_low_arc_or_lob"] = "no"
+    try:
+        apex = float(row["apex_ball_z"])
+        if apex < LOW_ARC_APEX_Z_INCHES:
+            row["suspected_low_arc_or_lob"] = "yes"
+    except (TypeError, ValueError, KeyError):
+        pass
+
+
+def _build_row_for_release_index(
+    i: int,
+    path: str,
+    frames: np.ndarray,
+    periods: np.ndarray,
+    game_clks: np.ndarray,
+    shot_clks: np.ndarray,
+    ball_x: np.ndarray,
+    ball_y: np.ndarray,
+    ball_z: np.ndarray,
+    last_touch: np.ndarray,
+    player_map: Dict[int, Tuple[str, int, str]],
+    pos_map: Dict[Tuple[int, int], Tuple],
+    heat_team_id: int,
+    opponent: str,
+    pbp_events: List[dict],
+    *,
+    forced_pbp: Optional[Tuple[dict, int]] = None,
+    rim_approach_max_in: float = 18.0,
+    allowed_z_thresholds: Tuple[float, ...] = (RELEASE_Z_THRESHOLD,),
+    pbp_rescued_flag: str = "no",
+) -> Tuple[Optional[dict], int]:
+    """
+    Build one output row for a candidate release frame index i.
+    Returns (row, pbp_idx) with pbp_idx = -1 if no PBP row should be marked used.
+    """
+    if not any(_release_geometry_ok(i, ball_z, zt) for zt in allowed_z_thresholds):
+        return None, -1
+
+    raw_touch = last_touch[i]
+    if raw_touch is None or (isinstance(raw_touch, float) and np.isnan(raw_touch)):
+        return None, -1
+    shooter_id = int(raw_touch)
+    shooter_info = player_map.get(shooter_id)
+    if shooter_info is None:
+        return None, -1
+    shooter_name, shooter_team_id, shooter_team_name = shooter_info
+    if shooter_team_id == heat_team_id:
+        return None, -1
+
+    w = slice(i, i + APEX_SEARCH_FRAMES)
+    rim_dists: List[float] = []
+    for rx, ry in RIMS_XY:
+        d3 = np.sqrt(
+            (ball_x[w] - rx) ** 2 + (ball_y[w] - ry) ** 2 + (ball_z[w] - RIM_Z) ** 2
+        )
+        rim_dists.append(float(np.nanmin(d3)))
+    min_rim_dist = min(rim_dists)
+    if min_rim_dist > rim_approach_max_in:
+        return None, -1
+    rim_x, rim_y = RIMS_XY[0 if rim_dists[0] < rim_dists[1] else 1]
+
+    shooter_pos = pos_map.get((int(frames[i]), shooter_id))
+    if shooter_pos is None:
+        return None, -1
+    shooter_x, shooter_y = shooter_pos[0], shooter_pos[1]
+    shooter_dist_in = math.hypot(shooter_x - rim_x, shooter_y - rim_y)
+    if shooter_dist_in < THREEPT_MIN_INCHES:
+        return None, -1
+
+    apex_local = int(np.argmax(ball_z[w]))
+    apex_i = i + apex_local
+    apex_frame = int(frames[apex_i])
+    apex_game_clock = _safe_clock_str(game_clks[apex_i])
+    apex_shot_clock = _safe_clock_str(shot_clks[apex_i])
+    apex_ball_z = round(float(ball_z[apex_i]), 2)
+
+    best_id, best_name, best_dist = None, "", float("inf")
+    for pid, (name, tid, _) in player_map.items():
+        if tid != heat_team_id:
+            continue
+        dpos = pos_map.get((int(frames[i]), pid))
+        if dpos is None:
+            continue
+        d = math.hypot(dpos[0] - shooter_x, dpos[1] - shooter_y)
+        if d < best_dist:
+            best_dist = d
+            best_id = pid
+            best_name = name
+    if best_id is None:
+        return None, -1
+
+    prior_i = max(0, i - 30)
+    prior_def = pos_map.get((int(frames[prior_i]), best_id))
+    closeout_delta_ft = 0.0
+    closeout_speed = 0.0
+    if prior_def is not None:
+        prior_dist_in = math.hypot(prior_def[0] - shooter_x, prior_def[1] - shooter_y)
+        closeout_delta_ft = (prior_dist_in - best_dist) / 12.0
+        closeout_speed = closeout_delta_ft / 0.5
+
+    def_now = pos_map[(int(frames[i]), best_id)]
+    angle = _angle_deg(
+        shooter_x - def_now[0],
+        shooter_y - def_now[1],
+        rim_x - shooter_x,
+        rim_y - shooter_y,
+    )
+
+    lw, rw = def_now[3], def_now[4]
+    if not math.isnan(lw) and not math.isnan(rw):
+        hand_up_in = max(lw, rw) - def_now[2]
+    elif not math.isnan(lw):
+        hand_up_in = lw - def_now[2]
+    elif not math.isnan(rw):
+        hand_up_in = rw - def_now[2]
+    else:
+        hand_up_in = 0.0
+
+    contest_dist_ft = best_dist / 12.0
+    scq = _contest_quality(contest_dist_ft, closeout_speed, angle, hand_up_in)
+
+    release_game_clock = _safe_clock_str(game_clks[i])
+    release_shot_clock = _safe_clock_str(shot_clks[i])
+    period = int(periods[i])
+    release_sec = _parquet_clock_to_sec(release_game_clock)
+
+    pbp_idx = -1
+    if forced_pbp is not None:
+        pbp, pbp_idx = forced_pbp
+        pbp_result = pbp["shot_result"]
+        pbp_clock = _sec_to_mmss(pbp["remaining_sec"])
+        pbp_desc = pbp["description"]
+    else:
+        pbp, pbp_idx = _match_pbp(pbp_events, shooter_id, period, release_sec)
+        if pbp:
+            pbp_result = pbp["shot_result"]
+            pbp_clock = _sec_to_mmss(pbp["remaining_sec"])
+            pbp_desc = pbp["description"]
+        else:
+            pbp_idx = -1
+            pbp_result = NA
+            pbp_clock = NA
+            pbp_desc = NA
+
+    row = {
+        "game_file": os.path.basename(path),
+        "game_id": _game_id_from_filename(os.path.basename(path)) or NA,
+        "opponent": opponent,
+        "period": period,
+        "release_frame": int(frames[i]),
+        "release_game_clock": release_game_clock,
+        "release_shot_clock": release_shot_clock,
+        "shooter_id": shooter_id,
+        "shooter_name": shooter_name,
+        "shooter_team": shooter_team_name,
+        "shooter_dist_to_rim_in": round(shooter_dist_in, 2),
+        "rim_x": rim_x,
+        "rim_y": rim_y,
+        "release_ball_x": round(float(ball_x[i]), 3),
+        "release_ball_y": round(float(ball_y[i]), 3),
+        "release_ball_z": round(float(ball_z[i]), 3),
+        "apex_frame": apex_frame,
+        "apex_game_clock": apex_game_clock,
+        "apex_shot_clock": apex_shot_clock,
+        "apex_ball_z": apex_ball_z,
+        "min_ball_rim_3d_in": round(min_rim_dist, 2),
+        "nearest_defender_id": best_id,
+        "nearest_defender_name": best_name,
+        "contest_distance_ft": round(contest_dist_ft, 3),
+        "closeout_speed_ft_s": round(closeout_speed, 3),
+        "closeout_delta_ft_500ms": round(closeout_delta_ft, 3),
+        "contest_angle_deg": round(angle, 2),
+        "hand_up_in": round(hand_up_in, 2),
+        "shot_contest_quality": scq,
+        "pbp_shot_result": pbp_result,
+        "pbp_conclusion_game_clock": pbp_clock,
+        "pbp_description": pbp_desc,
+        "pbp_rescued": pbp_rescued_flag,
+        "analysis_eligible": NA,
+        "exclusion_reason": NA,
+        "suspected_low_arc_or_lob": NA,
+    }
+    return row, pbp_idx
+
+
+def _rescue_unmatched_pbp_shots(
+    path: str,
+    frames: np.ndarray,
+    periods: np.ndarray,
+    game_clks: np.ndarray,
+    shot_clks: np.ndarray,
+    ball_x: np.ndarray,
+    ball_y: np.ndarray,
+    ball_z: np.ndarray,
+    last_touch: np.ndarray,
+    player_map: Dict[int, Tuple[str, int, str]],
+    pos_map: Dict[Tuple[int, int], Tuple],
+    heat_team_id: int,
+    opponent: str,
+    pbp_events: List[dict],
+    matched_pbp_idx: set,
+    used_release_frames: Set[int],
+    lag_min_sec: float,
+    lag_max_sec: float,
+    preferred_lag_sec: float,
+) -> List[dict]:
+    """
+    Second pass: align unmatched PBP 3PA to tracking using resolution clock + lag window.
+    Helps with back-to-back attempts and flat trajectories missed by the primary pass.
+    """
+    unmatched_idx = [j for j in range(len(pbp_events)) if j not in matched_pbp_idx]
+    # Chronological within each period (higher remaining clock = earlier in period)
+    unmatched_idx.sort(key=lambda j: (pbp_events[j]["period"], -pbp_events[j]["remaining_sec"]))
+
+    rescued: List[dict] = []
+    z_tiers_rescue = (
+        RELEASE_Z_THRESHOLD,
+        RELEASE_Z_THRESHOLD_RELAXED,
+        72.0,
+    )
+
+    for j in unmatched_idx:
+        evt = pbp_events[j]
+        conclusion = evt["remaining_sec"]
+        if math.isnan(conclusion):
+            continue
+        win_lo = conclusion + lag_min_sec
+        win_hi = conclusion + lag_max_sec
+        candidates: List[int] = []
+        for i in range(3, len(frames) - APEX_SEARCH_FRAMES):
+            if int(periods[i]) != evt["period"]:
+                continue
+            lt = last_touch[i]
+            if lt is None or (isinstance(lt, float) and np.isnan(lt)):
+                continue
+            if int(lt) != evt["person_id"]:
+                continue
+            rframe = int(frames[i])
+            if rframe in used_release_frames:
+                continue
+            gsec = _parquet_clock_to_sec(_safe_clock_str(game_clks[i]))
+            if math.isnan(gsec):
+                continue
+            if not (win_lo <= gsec <= win_hi):
+                continue
+            candidates.append(i)
+
+        if not candidates:
+            continue
+
+        pref = conclusion + preferred_lag_sec
+        candidates.sort(
+            key=lambda ii: abs(_parquet_clock_to_sec(_safe_clock_str(game_clks[ii])) - pref)
+        )
+
+        placed = False
+        for i in candidates:
+            row, _ = _build_row_for_release_index(
+                i,
+                path,
+                frames,
+                periods,
+                game_clks,
+                shot_clks,
+                ball_x,
+                ball_y,
+                ball_z,
+                last_touch,
+                player_map,
+                pos_map,
+                heat_team_id,
+                opponent,
+                pbp_events,
+                forced_pbp=(evt, j),
+                rim_approach_max_in=RESCUE_RIM_APPROACH_MAX_IN,
+                allowed_z_thresholds=z_tiers_rescue,
+                pbp_rescued_flag="yes",
+            )
+            if row is None:
+                continue
+            used_release_frames.add(int(frames[i]))
+            matched_pbp_idx.add(j)
+            rescued.append(row)
+            placed = True
+            break
+        if not placed:
+            continue
+
+    return rescued
+
+
 # ---------------------------------------------------------------------------
 # Per-game extraction
 # ---------------------------------------------------------------------------
 
 def _extract_one_game(
-    path: str, pbp_events: List[dict]
+    path: str,
+    pbp_events: List[dict],
+    *,
+    rescue_pbp_only: bool,
+    pbp_rescue_lag_min: float,
+    pbp_rescue_lag_max: float,
+    pbp_rescue_preferred_lag: float,
+    heave_min_dist_from_rim_in: float,
+    min_shot_clock_for_analysis: float,
+    desperate_shot_clock_sec: float,
 ) -> Tuple[List[dict], set, str]:
     """
     Returns:
@@ -331,181 +716,89 @@ def _extract_one_game(
     heat_team_id = next(v[1] for v in player_map.values() if v[2] == "Heat")
     opponent = next((nm for nm in team_names if nm != "Heat"), "Unknown")
 
-    # Build numpy arrays for fast frame-by-frame scanning
-    frames     = np.array(frame_tbl["frame"],              dtype=np.int64)
-    periods    = np.array(frame_tbl["period"],             dtype=np.int64)
-    game_clks  = np.array(frame_tbl["gameClockTime"])      # object array; may be str or None
-    shot_clks  = np.array(frame_tbl["shotClockTime"])      # object array
-    ball_x     = np.array(frame_tbl["ball_x"],             dtype=float)
-    ball_y     = np.array(frame_tbl["ball_y"],             dtype=float)
-    ball_z     = np.array(frame_tbl["ball_z"],             dtype=float)
+    frames = np.array(frame_tbl["frame"], dtype=np.int64)
+    periods = np.array(frame_tbl["period"], dtype=np.int64)
+    game_clks = np.array(frame_tbl["gameClockTime"])
+    shot_clks = np.array(frame_tbl["shotClockTime"])
+    ball_x = np.array(frame_tbl["ball_x"], dtype=float)
+    ball_y = np.array(frame_tbl["ball_y"], dtype=float)
+    ball_z = np.array(frame_tbl["ball_z"], dtype=float)
     last_touch = np.array(frame_tbl["last_touch_player_id"])
 
     rows: List[dict] = []
     matched_pbp_idx: set = set()
+    used_release_frames: Set[int] = set()
     last_shot_idx = -999
 
     for i in range(3, len(frames) - APEX_SEARCH_FRAMES):
-        # Cooldown: ignore detections within 20 frames of the previous shot
         if i - last_shot_idx < 20:
             continue
 
-        # ── Release detection ────────────────────────────────────────────────
-        # Ball crosses RELEASE_Z_THRESHOLD (90 in / 7.5 ft) going upward,
-        # and is still rising 2 frames later (rules out momentary spikes).
-        if not (ball_z[i-1] < RELEASE_Z_THRESHOLD <= ball_z[i] and ball_z[i+2] > ball_z[i]):
-            continue
-
-        # ── Identify shooter ─────────────────────────────────────────────────
-        raw_touch = last_touch[i]
-        if raw_touch is None or (isinstance(raw_touch, float) and np.isnan(raw_touch)):
-            continue
-        shooter_id = int(raw_touch)
-        shooter_info = player_map.get(shooter_id)
-        if shooter_info is None:
-            continue
-        shooter_name, shooter_team_id, shooter_team_name = shooter_info
-        if shooter_team_id == heat_team_id:
-            continue   # Heat offensive shot — skip
-
-        # ── Verify ball approaches a rim (not a dribble / pass) ──────────────
-        # Scan the next APEX_SEARCH_FRAMES frames and check min 3-D distance to either rim.
-        w = slice(i, i + APEX_SEARCH_FRAMES)
-        rim_dists = []
-        for rx, ry in RIMS_XY:
-            d3 = np.sqrt(
-                (ball_x[w] - rx)**2 + (ball_y[w] - ry)**2 + (ball_z[w] - RIM_Z)**2
-            )
-            rim_dists.append(float(np.nanmin(d3)))
-        min_rim_dist = min(rim_dists)
-        if min_rim_dist > 18.0:
-            continue   # never got close to either rim — not a shot
-        rim_x, rim_y = RIMS_XY[0 if rim_dists[0] < rim_dists[1] else 1]
-
-        # ── Verify 3-point distance ──────────────────────────────────────────
-        shooter_pos = pos_map.get((int(frames[i]), shooter_id))
-        if shooter_pos is None:
-            continue
-        shooter_x, shooter_y = shooter_pos[0], shooter_pos[1]
-        shooter_dist_in = math.hypot(shooter_x - rim_x, shooter_y - rim_y)
-        if shooter_dist_in < THREEPT_MIN_INCHES:
-            continue
-
-        # ── Arc apex ─────────────────────────────────────────────────────────
-        # Find the frame of maximum ball height within the search window.
-        # This is the peak of the parabolic arc — purely from position data.
-        apex_local = int(np.argmax(ball_z[w]))
-        apex_i = i + apex_local
-        apex_frame     = int(frames[apex_i])
-        apex_game_clock = _safe_clock_str(game_clks[apex_i])
-        apex_shot_clock = _safe_clock_str(shot_clks[apex_i])
-        apex_ball_z     = round(float(ball_z[apex_i]), 2)
-
-        # ── Nearest Heat defender ────────────────────────────────────────────
-        best_id, best_name, best_dist = None, "", float("inf")
-        for pid, (name, tid, _) in player_map.items():
-            if tid != heat_team_id:
-                continue
-            dpos = pos_map.get((int(frames[i]), pid))
-            if dpos is None:
-                continue
-            d = math.hypot(dpos[0] - shooter_x, dpos[1] - shooter_y)
-            if d < best_dist:
-                best_dist = d
-                best_id   = pid
-                best_name = name
-        if best_id is None:
-            continue
-
-        # ── Contest features ─────────────────────────────────────────────────
-        # Closeout speed: defender position delta over ~500 ms (30 frames at 60 Hz)
-        prior_i = max(0, i - 30)
-        prior_def = pos_map.get((int(frames[prior_i]), best_id))
-        closeout_delta_ft = 0.0
-        closeout_speed    = 0.0
-        if prior_def is not None:
-            prior_dist_in  = math.hypot(prior_def[0] - shooter_x, prior_def[1] - shooter_y)
-            closeout_delta_ft = (prior_dist_in - best_dist) / 12.0
-            closeout_speed    = closeout_delta_ft / 0.5
-
-        # Contest angle: inline (0°) = defender squarely between shooter and rim
-        def_now = pos_map[(int(frames[i]), best_id)]
-        angle = _angle_deg(
-            shooter_x - def_now[0], shooter_y - def_now[1],  # defender → shooter
-            rim_x - shooter_x,      rim_y - shooter_y,        # shooter → rim
+        row, pbp_idx = _build_row_for_release_index(
+            i,
+            path,
+            frames,
+            periods,
+            game_clks,
+            shot_clks,
+            ball_x,
+            ball_y,
+            ball_z,
+            last_touch,
+            player_map,
+            pos_map,
+            heat_team_id,
+            opponent,
+            pbp_events,
+            forced_pbp=None,
+            rim_approach_max_in=18.0,
+            allowed_z_thresholds=(RELEASE_Z_THRESHOLD,),
+            pbp_rescued_flag="no",
         )
-
-        # Hand height: max wrist above defender torso
-        lw, rw = def_now[3], def_now[4]
-        if not math.isnan(lw) and not math.isnan(rw):
-            hand_up_in = max(lw, rw) - def_now[2]
-        elif not math.isnan(lw):
-            hand_up_in = lw - def_now[2]
-        elif not math.isnan(rw):
-            hand_up_in = rw - def_now[2]
-        else:
-            hand_up_in = 0.0
-
-        contest_dist_ft = best_dist / 12.0
-        scq = _contest_quality(contest_dist_ft, closeout_speed, angle, hand_up_in)
-
-        # ── PBP outcome ──────────────────────────────────────────────────────
-        release_game_clock = _safe_clock_str(game_clks[i])
-        release_shot_clock = _safe_clock_str(shot_clks[i])
-        period = int(periods[i])
-        release_sec = _parquet_clock_to_sec(release_game_clock)
-
-        pbp, pbp_idx = _match_pbp(pbp_events, shooter_id, period, release_sec)
-        if pbp:
+        if row is None:
+            continue
+        if pbp_idx >= 0:
             matched_pbp_idx.add(pbp_idx)
-            pbp_result  = pbp["shot_result"]
-            pbp_clock   = _sec_to_mmss(pbp["remaining_sec"])
-            pbp_desc    = pbp["description"]
-        else:
-            pbp_result  = NA
-            pbp_clock   = NA
-            pbp_desc    = NA
-
-        rows.append({
-            # Identifiers
-            "game_file":   os.path.basename(path),
-            "game_id":     _game_id_from_filename(os.path.basename(path)) or NA,
-            "opponent":    opponent,
-            "period":      period,
-            # Release
-            "release_frame":          int(frames[i]),
-            "release_game_clock":     release_game_clock,
-            "release_shot_clock":     release_shot_clock,
-            "shooter_id":             shooter_id,
-            "shooter_name":           shooter_name,
-            "shooter_team":           shooter_team_name,
-            "shooter_dist_to_rim_in": round(shooter_dist_in, 2),
-            "rim_x":                  rim_x,
-            "rim_y":                  rim_y,
-            "release_ball_x":         round(float(ball_x[i]), 3),
-            "release_ball_y":         round(float(ball_y[i]), 3),
-            "release_ball_z":         round(float(ball_z[i]), 3),
-            # Arc apex
-            "apex_frame":       apex_frame,
-            "apex_game_clock":  apex_game_clock,
-            "apex_shot_clock":  apex_shot_clock,
-            "apex_ball_z":      apex_ball_z,
-            # Contest features
-            "min_ball_rim_3d_in":       round(min_rim_dist, 2),
-            "nearest_defender_id":      best_id,
-            "nearest_defender_name":    best_name,
-            "contest_distance_ft":      round(contest_dist_ft, 3),
-            "closeout_speed_ft_s":      round(closeout_speed, 3),
-            "closeout_delta_ft_500ms":  round(closeout_delta_ft, 3),
-            "contest_angle_deg":        round(angle, 2),
-            "hand_up_in":               round(hand_up_in, 2),
-            "shot_contest_quality":     scq,
-            # PBP outcome
-            "pbp_shot_result":           pbp_result,
-            "pbp_conclusion_game_clock": pbp_clock,
-            "pbp_description":           pbp_desc,
-        })
+        used_release_frames.add(int(frames[i]))
+        _finalize_row_analysis_columns(
+            row,
+            heave_min_dist_from_rim_in=heave_min_dist_from_rim_in,
+            min_shot_clock=min_shot_clock_for_analysis,
+            desperate_shot_clock=desperate_shot_clock_sec,
+        )
+        rows.append(row)
         last_shot_idx = i
+
+    if rescue_pbp_only:
+        extra = _rescue_unmatched_pbp_shots(
+            path,
+            frames,
+            periods,
+            game_clks,
+            shot_clks,
+            ball_x,
+            ball_y,
+            ball_z,
+            last_touch,
+            player_map,
+            pos_map,
+            heat_team_id,
+            opponent,
+            pbp_events,
+            matched_pbp_idx,
+            used_release_frames,
+            lag_min_sec=pbp_rescue_lag_min,
+            lag_max_sec=pbp_rescue_lag_max,
+            preferred_lag_sec=pbp_rescue_preferred_lag,
+        )
+        for row in extra:
+            _finalize_row_analysis_columns(
+                row,
+                heave_min_dist_from_rim_in=heave_min_dist_from_rim_in,
+                min_shot_clock=min_shot_clock_for_analysis,
+                desperate_shot_clock=desperate_shot_clock_sec,
+            )
+            rows.append(row)
 
     return rows, matched_pbp_idx, opponent
 
@@ -513,6 +806,30 @@ def _extract_one_game(
 # ---------------------------------------------------------------------------
 # Unmatched output schema
 # ---------------------------------------------------------------------------
+
+# Reasons mirrored in _finalize_row_analysis_columns()
+HEAVE_AUDIT_REASONS = frozenset({
+    "heave_long_distance",
+    "shot_clock_below_1s",
+    "desperate_shot_clock_le_0p8",
+    "pbp_keyword_heave",
+})
+
+HEAVE_AUDIT_FIELDNAMES = [
+    "game_file", "game_id", "opponent", "period",
+    "release_frame", "release_game_clock", "release_shot_clock",
+    "shooter_id", "shooter_name",
+    "shooter_dist_to_rim_in",
+    "pbp_shot_result", "pbp_conclusion_game_clock", "pbp_description",
+    "pbp_rescued", "exclusion_reason",
+]
+
+
+def _row_is_heave_audit(row: dict) -> bool:
+    """True if excluded primarily for distance / end-of-clock heave rules."""
+    parts = [p for p in (row.get("exclusion_reason") or "").split(";") if p]
+    return bool(parts) and any(p in HEAVE_AUDIT_REASONS for p in parts)
+
 
 UNMATCHED_FIELDNAMES = [
     "unmatched_type",       # "tracking_only" or "pbp_only"
@@ -546,7 +863,46 @@ def main() -> None:
         "--pbp-delay", type=float, default=0.5,
         help="Seconds to wait between NBA CDN requests (default: 0.5).",
     )
+    parser.add_argument(
+        "--no-pbp-rescue", action="store_true",
+        help="Skip second-pass matching for pbp_only events (clock-guided rescue).",
+    )
+    parser.add_argument(
+        "--pbp-rescue-lag-min", type=float, default=PBP_RESCUE_LAG_MIN_SEC,
+        help="Min seconds (release_remaining - conclusion_remaining) for rescue window.",
+    )
+    parser.add_argument(
+        "--pbp-rescue-lag-max", type=float, default=PBP_RESCUE_LAG_MAX_SEC,
+        help="Max seconds for rescue window.",
+    )
+    parser.add_argument(
+        "--pbp-rescue-preferred-lag", type=float, default=PBP_RESCUE_PREFERRED_LAG_SEC,
+        help="Preferred flight-time offset inside the rescue window.",
+    )
+    parser.add_argument(
+        "--heave-min-ft-from-rim", type=float, default=42.0,
+        help="Treat shooter distances ≥ this many feet from attacking rim as heaves.",
+    )
+    parser.add_argument(
+        "--min-shot-clock-analysis", type=float, default=MIN_SHOT_CLOCK_FOR_ANALYSIS,
+        help="Exclude attempts with shot clock strictly below this at release.",
+    )
+    parser.add_argument(
+        "--desperate-shot-clock", type=float, default=DESPERATE_SHOT_CLOCK_SEC,
+        help="Also tag <= this shot-clock value as desperation (logged in exclusion_reason).",
+    )
+    parser.add_argument(
+        "--excluded-heaves-csv", default=None,
+        help="Optional path for heave / desperation exclusions audit file "
+        "(default: <output-csv basename>_excluded_heaves.csv).",
+    )
     args = parser.parse_args()
+
+    if not os.path.isdir(args.input_dir):
+        sys.exit(
+            f"Input directory does not exist:\n  {args.input_dir}\n"
+            "Pass the real folder with your *_processed.parquet files — not a placeholder path."
+        )
 
     parquet_files = sorted(
         os.path.join(args.input_dir, f)
@@ -556,9 +912,12 @@ def main() -> None:
     if not parquet_files:
         sys.exit(f"No .parquet files found in {args.input_dir}")
 
-    # Derive unmatched CSV path from the main output path
     base, ext = os.path.splitext(args.output_csv)
     unmatched_csv = f"{base}_unmatched{ext}"
+    heaves_csv = args.excluded_heaves_csv or f"{base}_excluded_heaves{ext}"
+
+    heave_dist_in = float(args.heave_min_ft_from_rim) * 12.0
+    rescue_enabled = not args.no_pbp_rescue
 
     all_rows:      List[dict] = []
     all_unmatched: List[dict] = []
@@ -580,11 +939,26 @@ def main() -> None:
         pbp_events  = _parse_pbp_opponent_3pa(pbp_actions)
         print(f"  PBP: {len(pbp_events)} opponent 3PA events found")
 
-        game_rows, matched_pbp_idx, opponent = _extract_one_game(fp, pbp_events)
+        game_rows, matched_pbp_idx, opponent = _extract_one_game(
+            fp,
+            pbp_events,
+            rescue_pbp_only=rescue_enabled,
+            pbp_rescue_lag_min=args.pbp_rescue_lag_min,
+            pbp_rescue_lag_max=args.pbp_rescue_lag_max,
+            pbp_rescue_preferred_lag=args.pbp_rescue_preferred_lag,
+            heave_min_dist_from_rim_in=heave_dist_in,
+            min_shot_clock_for_analysis=args.min_shot_clock_analysis,
+            desperate_shot_clock_sec=args.desperate_shot_clock,
+        )
         matched = sum(1 for r in game_rows if r["pbp_shot_result"] != NA)
-        print(f"  Tracking: {len(game_rows)} shots detected | PBP matched: {matched} "
-              f"| tracking_only: {len(game_rows) - matched} "
-              f"| pbp_only: {len(pbp_events) - len(matched_pbp_idx)}")
+        rescued_n = sum(1 for r in game_rows if r.get("pbp_rescued") == "yes")
+        eligible_n = sum(1 for r in game_rows if r.get("analysis_eligible") == "yes")
+        print(
+            f"  Tracking rows: {len(game_rows)} | PBP matched rows: {matched} "
+            f"| pbp_rescued: {rescued_n} | analysis_eligible: {eligible_n}\n"
+            f"  Unmatched implied: tracking_only {len(game_rows) - matched} | "
+            f"pbp_only {len(pbp_events) - len(matched_pbp_idx)}"
+        )
 
         all_rows.extend(game_rows)
 
@@ -652,11 +1026,20 @@ def main() -> None:
         writer.writeheader()
         writer.writerows(all_unmatched)
 
+    heave_rows = [{k: r.get(k, NA) for k in HEAVE_AUDIT_FIELDNAMES} for r in all_rows if _row_is_heave_audit(r)]
+    with open(heaves_csv, "w", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(fh, fieldnames=HEAVE_AUDIT_FIELDNAMES)
+        writer.writeheader()
+        writer.writerows(heave_rows)
+
     total_matched   = sum(1 for r in all_rows if r["pbp_shot_result"] != NA)
     tracking_only   = sum(1 for r in all_unmatched if r["unmatched_type"] == "tracking_only")
     pbp_only        = sum(1 for r in all_unmatched if r["unmatched_type"] == "pbp_only")
+    eligible_all    = sum(1 for r in all_rows if r.get("analysis_eligible") == "yes")
 
     print(f"\nMain dataset : {len(all_rows)} rows ({total_matched} matched) -> {args.output_csv}")
+    print(f"Eligible     : {eligible_all} rows (analysis_eligible=yes)")
+    print(f"Excluded heaves audit: {len(heave_rows)} rows -> {heaves_csv}")
     print(f"Unmatched    : {len(all_unmatched)} rows "
           f"({tracking_only} tracking_only, {pbp_only} pbp_only) -> {unmatched_csv}")
 

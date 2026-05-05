@@ -14,13 +14,15 @@
 ├── data/
 │   ├── outputs/                          ← current analysis outputs
 │   │   ├── shot_contest_dataset.csv
-│   │   └── shot_contest_dataset_unmatched.csv
+│   │   ├── shot_contest_dataset_unmatched.csv
+│   │   └── shot_contest_dataset_excluded_heaves.csv   ← heave / desperation audit
 │   └── archive/                          ← old/superseded outputs
 ├── requirements.txt
 └── README.md
 ```
 
-Hawk-Eye parquet files live on OneDrive (not in this repo):
+Hawk-Eye parquet files live on OneDrive (not in this repo). Example path (quote it in the shell):
+
 `/Users/mariaangellobon/Library/CloudStorage/OneDrive-SharedLibraries-MassachusettsInstituteofTechnology/[MIT] Basketball Officiating - miami_heat_2025`
 
 ## Quick Start
@@ -33,77 +35,136 @@ Hawk-Eye parquet files live on OneDrive (not in this repo):
    ```bash
    pip install -r requirements.txt
    ```
-3. Run the main pipeline (produces both output CSVs):
+3. Run the main pipeline (writes the three CSVs under `data/outputs/` when you point `--output-csv` there):
    ```bash
    python scripts/build_unified_shot_dataset.py \
-       --input-dir '/path/to/OneDrive/[MIT] Basketball Officiating - miami_heat_2025' \
+       --input-dir '/Users/mariaangellobon/Library/CloudStorage/OneDrive-SharedLibraries-MassachusettsInstituteofTechnology/[MIT] Basketball Officiating - miami_heat_2025' \
        --output-csv data/outputs/shot_contest_dataset.csv
    ```
 
+Do **not** use placeholder paths like `/path/to/miami_heat_2025` — the script requires a real directory containing `*_processed.parquet` files.
+
+## Pipeline decisions (unified build)
+
+The script runs in two stages for each game:
+
+1. **Primary Hawk-Eye pass** — Same as before: upward `ball_z` crossing at ~7.5 ft (90 in), opponent shooter, three-point distance, ball approaches a rim within a tight proximity check, nearest Heat defender at release, then PBP match on shooter + period + game clock (~5 s window after release).
+
+2. **PBP rescue pass (on by default)** — For opponent 3PA rows that never matched tracking, search again using the **PBP resolution clock** as an anchor: tracking **release** should sit about **1–2 seconds earlier** on the **game-clock countdown** than the PBP timestamp (configurable lag window). Uses the same shooter (`last_touch`), a **relaxed** ball-height crossing and a **looser** rim-proximity check so flat shots and some airballs can still yield a row. Successful rows are tagged **`pbp_rescued` = yes** and linked to that PBP event. This reduces back-to-back same-shooter misses (e.g. two pull-ups in a few seconds) when the primary matcher attached the wrong PBP row or missed one release.
+
+**Analytic inclusion** is separate from raw detection:
+
+- **`analysis_eligible`** — `yes` only if the row passes all filters below; use this for modeling or summary tables that should exclude junk or ambiguous events.
+- **`exclusion_reason`** — Semicolon-separated codes when `analysis_eligible` is `no`.
+
+Exclusion rules (tune via CLI):
+
+| Code | Meaning |
+|------|---------|
+| `no_pbp_match` | Tracking detection with no matching PBP (treated as out of scope for outcome-based analysis; after video review many are post-whistle or non-shot motion). |
+| `heave_long_distance` | Shooter distance to the **attacking** rim ≥ `--heave-min-ft-from-rim` (default **42 ft**, ~half-court territory). |
+| `shot_clock_below_1s` | Shot clock at release strictly **&lt; 1.0 s**. |
+| `desperate_shot_clock_le_0p8` | Shot clock at release **≤ 0.8 s** (explicit desperation tag). |
+| `pbp_keyword_heave` | `pbp_description` contains `heave`. |
+
+**`suspected_low_arc_or_l`** — Heuristic only: apex ball height below ~**158 in** suggests a flat trajectory or a mis-tagged play (e.g. lob near the rim). Does **not** auto-exclude; use for manual QA.
+
+## CLI reference (`build_unified_shot_dataset.py`)
+
+| Flag | Default | Role |
+|------|---------|------|
+| `--input-dir` | (required) | Folder of `*_processed.parquet` |
+| `--output-csv` | `shot_contest_dataset.csv` | Main output; `_unmatched` and `_excluded_heaves` paths are derived from this basename unless overridden |
+| `--pbp-delay` | `0.5` | Sleep between NBA CDN PBP requests |
+| `--no-pbp-rescue` | off | Disable the second-pass PBP rescue |
+| `--pbp-rescue-lag-min` / `--pbp-rescue-lag-max` | `0.9` / `2.8` | Game-clock seconds: expected release remaining minus PBP remaining |
+| `--pbp-rescue-preferred-lag` | `1.55` | Preferred offset inside that window |
+| `--heave-min-ft-from-rim` | `42` | Long-distance heave cutoff (feet from rim) |
+| `--min-shot-clock-analysis` | `1.0` | Minimum release shot clock to stay eligible |
+| `--desperate-shot-clock` | `0.8` | Also flag ≤ this value in `exclusion_reason` |
+| `--excluded-heaves-csv` | auto | Override path for the heave audit file |
+
 ## Output Files
 
-### `shot_contest_dataset.csv` — primary analysis dataset
-459 rows, one per opponent 3-point attempt across all 15 games. Every row is a shot we detected in the Hawk-Eye tracking data, enriched with contest features and linked to the NBA play-by-play where possible.
+### `shot_contest_dataset.csv` — primary dataset
 
-Columns are organized in five blocks:
+One row per **tracking-backed** opponent 3-point attempt (primary pass plus any **rescued** PBP row that found a matching release). Counts change when you re-run the pipeline; older bullet statistics in this README may be stale—recompute from your CSV after each run.
+
+Column groups:
 
 | Block | Columns | Source |
-|---|---|---|
+|------|---------|--------|
 | Identifiers | `game_file`, `game_id`, `opponent`, `period` | — |
-| Release | `release_frame`, `release_game_clock`, `release_shot_clock`, shooter info, ball position at release | Hawk-Eye |
+| Release | `release_frame`, `release_game_clock`, `release_shot_clock`, shooter info, ball at release | Hawk-Eye |
 | Arc apex | `apex_frame`, `apex_game_clock`, `apex_shot_clock`, `apex_ball_z` | Hawk-Eye |
-| Contest features | `contest_distance_ft`, `closeout_speed_ft_s`, `closeout_delta_ft_500ms`, `contest_angle_deg`, `hand_up_in`, `shot_contest_quality` | Hawk-Eye |
-| PBP outcome | `pbp_shot_result`, `pbp_conclusion_game_clock`, `pbp_description` | NBA CDN play-by-play |
+| Contest | `min_ball_rim_3d_in`, defender info, `contest_*`, `hand_up_in`, `shot_contest_quality` | Hawk-Eye |
+| PBP | `pbp_shot_result`, `pbp_conclusion_game_clock`, `pbp_description` | NBA CDN |
+| QA / filters | `pbp_rescued`, `analysis_eligible`, `exclusion_reason`, `suspected_low_arc_or_lob` | Derived |
 
-Key numbers from the current data:
-- 408 of 459 shots have a confirmed Made/Missed result (192 made, 216 missed); 51 have no PBP match
-- Average defender distance at release: **6.8 ft** (range 1.6–19.2 ft)
-- Average apex height: **189.6 inches (~15.8 ft)**; release-to-apex gap is typically ~1 second
-- SCQ mean: **47.3**, max: **73.4** (0–100 scale, weights not yet validated)
+Clock semantics:
 
-The `release_game_clock` is when the ball left the hand. The `pbp_conclusion_game_clock` is when the shot resolved (made or missed). The gap between them is the flight time. The `pbp_description` is the NBA's own text for the play (e.g. `"A. Green 24' 3PT (3 PTS)"` or `"MISS R. Rollins 24' pullup 3PT"`), useful for identifying shot type.
+- **`release_game_clock`** — When the ball leaves the shooter’s hands (tracking).
+- **`pbp_conclusion_game_clock`** — When the play-by-play records the shot resolving (made/missed); typically **earlier** on the countdown than release by about **1–2 s** of game time.
 
-Generated by: `HawkeyeScripts/build_unified_shot_dataset.py`
+Generated by: `scripts/build_unified_shot_dataset.py`
 
 ---
 
 ### `shot_contest_dataset_unmatched.csv` — diagnostic file
-192 rows of events that could not be matched between Hawk-Eye and PBP. The `unmatched_type` column splits them into two groups:
 
-- **`tracking_only` (51 rows)** — Hawk-Eye detected a shot but no PBP event matched within 5 seconds. Likely causes: pump fakes, plays fouled before the shot was recorded, or clock drift in that game. These rows have contest features but no outcome.
-- **`pbp_only` (141 rows)** — The NBA play-by-play recorded a 3PA that Hawk-Eye never detected. Likely causes: flat shot trajectories (especially corners) that don't cross the 7.5 ft ball-height threshold, or off-balance attempts. These rows have outcome and description but no contest features.
+Still produced every run. Rows where Hawk-Eye and PBP disagree **after** rescue:
 
-Use this file to audit detection quality and understand the limits of the Hawk-Eye approach before drawing conclusions from the main dataset.
+- **`tracking_only`** — Release detected but no PBP match. For analysis we mark these **`analysis_eligible` = no** in the main file (`no_pbp_match`). Video review on a sample game suggests many are fouls / post-whistle motion, not countable field-goal tries.
+- **`pbp_only`** — PBP lists a 3PA that never linked to tracking even after rescue (very flat trajectory, missing `last_touch`, data gap, etc.). Outcome-only for audit; no contest features.
 
-Generated by: `HawkeyeScripts/build_unified_shot_dataset.py` (same run, automatic)
+Generated by: `scripts/build_unified_shot_dataset.py` (same run)
+
+---
+
+### `shot_contest_dataset_excluded_heaves.csv` — heave / desperation audit
+
+Subset of main-dataset rows whose **`exclusion_reason`** includes any of:
+
+`heave_long_distance`, `shot_clock_below_1s`, `desperate_shot_clock_le_0p8`, `pbp_keyword_heave`
+
+Rows excluded **only** for `no_pbp_match` are **not** listed here (they remain in the main CSV with `analysis_eligible` = no).
+
+Override output path with `--excluded-heaves-csv` if needed.
 
 ---
 
 ## Notes
 
-- Be careful about overclaiming on defender intent — the data provides imputed intent at best
-- When presenting SCQ, always include scale context (min, max, central tendency)
-- Always activate the project venv (`source /Users/mariaangellobon/Desktop/TrackingData/.venv/bin/activate`) — system anaconda has a NumPy version conflict
+- Be careful about overclaiming on defender intent — the data provides imputed intent at best.
+- When presenting SCQ, always include scale context (min, max, central tendency).
+- Always activate the project venv (`source /Users/mariaangellobon/Desktop/TrackingData/.venv/bin/activate`) — system Anaconda has a NumPy version conflict with some stacks.
 
 ## Next Steps
 
-### In Progress
-- [x] **Merge PBP shot outcome into feature CSV** — done in `shot_contest_dataset.csv` via `build_unified_shot_dataset.py`
-- [x] **Rename time-source columns for clarity** — `release_game_clock`, `apex_game_clock`, `pbp_conclusion_game_clock` are now distinct columns
-- [ ] **Unmatched event audit** — review `shot_contest_dataset_unmatched.csv` to determine which events are real shots that belong in the main dataset. For `pbp_only` rows: manually or programmatically check whether the ball-z detector simply missed them (e.g. flat corner 3s) and whether they can be recovered by relaxing the detection threshold. For `tracking_only` rows: check whether the PBP window was too narrow (clock drift) or whether these were genuinely not shots (pump fakes, fouls). Any confirmed real shots recovered from this file should be added to `shot_contest_dataset.csv`.
-- [ ] **Shot segment table** — build a lightweight table with one row per shot containing only the timing and identity information needed to define the contest window. Columns: `game_file`, `game_id`, `shooter_id`, `shooter_name`, `nearest_defender_id`, `nearest_defender_name`, `pre_release_start_frame` (the frame ~5 seconds before release), `release_frame`, `apex_frame`, `conclusion_frame` (the frame corresponding to `pbp_conclusion_game_clock`). This table defines the start-to-end segment of each contest and is the input for all trajectory and movement analysis on the tracking data. **Caveat**: `pre_release_start_frame` is straightforward — at ~60 Hz, 5 seconds back is approximately `release_frame - 300`. `conclusion_frame` is harder: we currently have `pbp_conclusion_game_clock` as a clock string but not a frame number. Converting it requires re-opening each parquet and finding the frame whose `gameClockTime` is closest to that clock value in the same period — the same logic already used in `opponent_three_pointers.py`. Decide before building whether to do that frame lookup (more precise, heavier) or treat the clock string as sufficient to define the window end (simpler, good enough for most uses).
-- [ ] **Dual-defender detection** — extend the nearest-defender logic to flag a second Heat defender if they are within a similar distance to the primary (threshold TBD, ~2 ft). Add `primary_defender`, `secondary_defender`, `dual_closeout_flag` columns.
+### In Progress / Recently Addressed
+
+- [x] **Merge PBP shot outcome into feature CSV** — `shot_contest_dataset.csv` via `build_unified_shot_dataset.py`
+- [x] **Rename time-source columns** — `release_game_clock`, `apex_game_clock`, `pbp_conclusion_game_clock`
+- [x] **Recover many `pbp_only` events** — second-pass clock-anchored rescue + relaxed geometry; see `pbp_rescued`
+- [x] **Analytic filters** — `analysis_eligible`, heave / shot-clock exclusions, `_excluded_heaves.csv` audit
+- [x] **Low-arc / possible lob flag** — `suspected_low_arc_or_l` for manual review
+- [ ] **Continued unmatched audit** — especially remaining `pbp_only` and video validation of `suspected_low_arc_or_lob`
+- [ ] **Shot segment table** — lightweight table with `pre_release_start_frame`, `release_frame`, `apex_frame`, `conclusion_frame` (conclusion frame requires parquet clock→frame lookup; see `opponent_three_pointers.py` for precedent)
+- [ ] **Dual-defender detection** — secondary Heat defender within ~2 ft of primary; `dual_closeout_flag`
 
 ### Pending Decisions
-- [ ] **Define target variable for modeling** — candidates: binary `shot_made`, expected FG% delta, or shot difficulty score. This determines what SCQ ultimately predicts and how to interpret it.
-- [ ] **Dual-closeout distance threshold** — decide how close a second defender must be to the primary to count as a co-contestant.
-- [ ] **Corner vs. above-the-break stratification** — these are structurally different shots; decide whether SCQ should be split by zone.
+
+- [ ] **Target variable for modeling** — binary `shot_made`, expected FG% delta, or shot difficulty score
+- [ ] **Dual-closeout distance threshold**
+- [ ] **Corner vs. above-the-break stratification**
 
 ### Data Cleaning
-- [ ] **Garbage time filtering** — standard definition: large lead (e.g., >15 pts) + late game (Q4, <5 min remaining). Apply before any outcome-based analysis so garbage-time defensive effort doesn't bias the metric.
-- [ ] **False-positive shot detection QA** — validate Hawk-Eye ball-z candidate counts against PBP confirmed 3PA counts per game. Some candidates are dribble bumps or other ball elevation events.
+
+- [ ] **Garbage time filtering** — e.g. large lead + Q4 &lt; 5 min before outcome-based analysis
+- [ ] **False-positive shot detection QA** — compare tracking counts to PBP 3PA per game where `analysis_eligible` is yes
 
 ### Future (Modeling Phase)
-- [ ] Logistic regression / XGBoost on shot outcome using contest features
-- [ ] Evaluate whether mixed-effects models are needed to control for shooter or defender identity
-- [ ] Defender normalization — hand-up height may need to be normalized by player height
+
+- [ ] Logistic regression / XGBoost on shot outcome using contest features among `analysis_eligible` rows
+- [ ] Mixed-effects models for shooter/defender identity
+- [ ] Defender normalization (e.g. hand-up height vs. player height)
