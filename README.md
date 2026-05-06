@@ -12,11 +12,8 @@
 │   ├── load_parquet_from_onedrive.py     ← parquet preview utility
 │   └── hawkeye_extract_opponent_3pa.py   ← superseded; kept for reference
 ├── data/
-│   ├── outputs/                          ← current analysis outputs
-│   │   ├── shot_contest_dataset.csv
-│   │   ├── shot_contest_dataset_unmatched.csv
-│   │   └── shot_contest_dataset_excluded_heaves.csv   ← heave / desperation audit
-│   └── archive/                          ← old/superseded outputs
+│   ├── outputs/                          ← generated locally (gitignored — do not commit CSVs)
+│   └── archive/                          ← old local extracts (gitignored)
 ├── requirements.txt
 └── README.md
 ```

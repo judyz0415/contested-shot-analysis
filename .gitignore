@@ -1,2 +1,10 @@
 .python_packages/
 CLAUDE.md
+
+# Pipeline outputs and archived extracts — do not commit (game-level / identifiable detail).
+data/outputs/
+data/archive/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
