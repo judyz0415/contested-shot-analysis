@@ -1,6 +1,9 @@
 .python_packages/
 CLAUDE.md
 
+# Personal working notes (not for the remote repo)
+LOCAL_NOTES.md
+
 # Pipeline outputs and archived extracts — do not commit (game-level / identifiable detail).
 data/outputs/
 data/archive/
