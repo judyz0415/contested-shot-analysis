@@ -12,7 +12,7 @@ MIT Sloan **Analytics Insights (15.285)** project. Processed Hawk-Eye parquet fi
 │   ├── opponent_three_pointers.py      # PBP clock alignment helper
 │   ├── load_parquet_from_onedrive.py   # Parquet inspection
 │   └── hawkeye_extract_opponent_3pa.py # Earlier extractor (reference)
-├── data/outputs/                       # Local pipeline outputs (gitignored)
+├── data/outputs/                       # Local pipeline outputs
 ├── requirements.txt
 └── README.md
 ```
