@@ -45,6 +45,33 @@ def _plot_defender_lift(def_rows: List[Dict[str, str]], out_path: str) -> None:
     plt.close()
 
 
+def _plot_defender_lift_volume_normalized(def_rows: List[Dict[str, str]], out_path: str) -> None:
+    rows = []
+    for r in def_rows:
+        rows.append(
+            {
+                "name": r["nearest_defender_name"],
+                "shots": int(r["shots"]),
+                "lift": float(r["volume_normalized_lift_rate"]),
+            }
+        )
+    rows.sort(key=lambda x: x["lift"])
+    names = [f"{r['name']} ({r['shots']})" for r in rows]
+    lifts = [r["lift"] for r in rows]
+    colors = ["#1f77b4" if v < 0 else "#d62728" for v in lifts]
+
+    plt.figure(figsize=(10, 6))
+    y = range(len(rows))
+    plt.barh(y, lifts, color=colors, alpha=0.85)
+    plt.axvline(0.0, color="black", linewidth=1)
+    plt.yticks(y, names, fontsize=9)
+    plt.xlabel("Volume-normalized lift (Empirical-Bayes, actual - expected)")
+    plt.title("Defender Effectiveness (Volume-Normalized; negative is better)")
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=180)
+    plt.close()
+
+
 def _plot_calibration(
     cal_base: List[Dict[str, str]], cal_full: List[Dict[str, str]], out_path: str
 ) -> None:
@@ -101,11 +128,15 @@ def main() -> None:
     cal_full = _read_csv(cal_full_csv)
 
     _plot_defender_lift(defender_rows, os.path.join(args.out_dir, "viz_defender_lift_vs_baseline.png"))
+    _plot_defender_lift_volume_normalized(
+        defender_rows, os.path.join(args.out_dir, "viz_defender_lift_volume_normalized.png")
+    )
     _plot_calibration(cal_base, cal_full, os.path.join(args.out_dir, "viz_calibration_baseline_vs_full.png"))
     _plot_probability_shift(shot_rows, os.path.join(args.out_dir, "viz_probability_shift_base_vs_full.png"))
 
     print("Wrote visualizations:")
     print(" ", os.path.join(args.out_dir, "viz_defender_lift_vs_baseline.png"))
+    print(" ", os.path.join(args.out_dir, "viz_defender_lift_volume_normalized.png"))
     print(" ", os.path.join(args.out_dir, "viz_calibration_baseline_vs_full.png"))
     print(" ", os.path.join(args.out_dir, "viz_probability_shift_base_vs_full.png"))
 
