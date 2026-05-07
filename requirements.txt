@@ -1,3 +1,7 @@
 pandas
 numpy
 pyarrow
+matplotlib
+scipy
+plotly
+ipython
