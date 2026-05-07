@@ -211,6 +211,14 @@ def _write_csv(path: str, fieldnames: Sequence[str], rows: Sequence[Dict[str, st
         writer.writerows(rows)
 
 
+def _volume_normalized_lift(made: float, exp_makes: float, shots: int, prior_shots: float) -> float:
+    """
+    Empirical-Bayes style shrinkage toward 0-lift.
+    Equivalent to shrinking observed lift by n / (n + prior_shots).
+    """
+    return (made - exp_makes) / (shots + prior_shots)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Model defender effectiveness as lift vs baseline.")
     parser.add_argument(
@@ -228,6 +236,12 @@ def main() -> None:
         type=int,
         default=5,
         help="Minimum shots to report a defender-level lift row.",
+    )
+    parser.add_argument(
+        "--shrinkage-prior-shots",
+        type=float,
+        default=25.0,
+        help="Pseudo-shot prior for volume-normalized defender lift.",
     )
     args = parser.parse_args()
 
@@ -331,7 +345,7 @@ def main() -> None:
         )
 
     defender_aggs: Dict[Tuple[str, str], Dict[str, float]] = defaultdict(
-        lambda: {"n": 0.0, "made": 0.0, "exp_base": 0.0, "exp_full": 0.0}
+        lambda: {"n": 0.0, "made": 0.0, "exp_base": 0.0, "exp_full": 0.0, "var_base": 0.0}
     )
     for i, row in enumerate(shots):
         did = (row.get("nearest_defender_id") or "").strip()
@@ -341,6 +355,7 @@ def main() -> None:
         defender_aggs[key]["made"] += y[i]
         defender_aggs[key]["exp_base"] += p_base[i]
         defender_aggs[key]["exp_full"] += p_full[i]
+        defender_aggs[key]["var_base"] += p_base[i] * (1.0 - p_base[i])
 
     defender_rows: List[Dict[str, str]] = []
     for (did, dnm), s in sorted(defender_aggs.items(), key=lambda kv: kv[1]["n"], reverse=True):
@@ -350,6 +365,14 @@ def main() -> None:
         made = s["made"]
         exp_base = s["exp_base"]
         exp_full = s["exp_full"]
+        var_base = max(s["var_base"], 1e-9)
+        raw_lift_rate = (made - exp_base) / n
+        raw_lift_makes = made - exp_base
+        shrink_weight = n / (n + args.shrinkage_prior_shots)
+        volume_norm_lift_rate = _volume_normalized_lift(
+            made, exp_base, n, args.shrinkage_prior_shots
+        )
+        z_score = raw_lift_makes / math.sqrt(var_base)
         defender_rows.append(
             {
                 "nearest_defender_id": did,
@@ -358,8 +381,11 @@ def main() -> None:
                 "actual_make_rate": f"{made / n:.6f}",
                 "baseline_expected_make_rate": f"{exp_base / n:.6f}",
                 "full_expected_make_rate": f"{exp_full / n:.6f}",
-                "lift_vs_baseline_rate": f"{(made - exp_base) / n:.6f}",
+                "lift_vs_baseline_rate": f"{raw_lift_rate:.6f}",
                 "lift_vs_full_rate": f"{(made - exp_full) / n:.6f}",
+                "volume_normalized_lift_rate": f"{volume_norm_lift_rate:.6f}",
+                "shrinkage_weight": f"{shrink_weight:.6f}",
+                "lift_vs_baseline_z": f"{z_score:.6f}",
                 "actual_minus_expected_makes_baseline": f"{made - exp_base:.6f}",
                 "actual_minus_expected_makes_full": f"{made - exp_full:.6f}",
             }
@@ -400,6 +426,9 @@ def main() -> None:
             "full_expected_make_rate",
             "lift_vs_baseline_rate",
             "lift_vs_full_rate",
+            "volume_normalized_lift_rate",
+            "shrinkage_weight",
+            "lift_vs_baseline_z",
             "actual_minus_expected_makes_baseline",
             "actual_minus_expected_makes_full",
         ],
