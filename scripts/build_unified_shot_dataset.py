@@ -21,6 +21,7 @@ One row per opponent 3-point attempt. Columns:
     nearest_defender_id, nearest_defender_name
     contest_distance_ft, closeout_speed_ft_s, closeout_delta_ft_500ms
     contest_angle_deg, hand_up_in, shot_contest_quality
+    release_path_residual_in, alteredness  (pre-release path vs release-frame position)
 
   PBP outcome  (NBA CDN: matched within 5 s of release, same player+period)
     pbp_shot_result, pbp_conclusion_game_clock, pbp_description
@@ -58,6 +59,11 @@ LOCAL_SITE = os.path.join(os.getcwd(), ".python_packages")
 if os.path.isdir(LOCAL_SITE):
     sys.path.insert(0, LOCAL_SITE)
 
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if _SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPT_DIR)
+from shot_alteredness import path_residual_and_alteredness
+
 import numpy as np
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
@@ -72,6 +78,8 @@ RIM_Z = 120.0                               # 10 ft in inches
 THREEPT_MIN_INCHES = 264.0                  # ~22 ft; minimum distance for a 3PA
 RELEASE_Z_THRESHOLD = 90.0                  # ball must cross this height (inches) while rising
 APEX_SEARCH_FRAMES = 120                    # scan up to ~2 s after release for arc apex
+RELEASE_PATH_WINDOW_FRAMES = 12           # ~200 ms before release @ 60 Hz; linear extrapolation window
+ALTEREDNESS_REF_INCHES = 12.0              # residual (in); maps to alteredness 0–100 heuristic scale
 PBP_MATCH_WINDOW_SEC = 5.0                  # search up to 5 s after release in PBP
 PBP_CLOCK_BUFFER_SEC = 1.0                  # allow 1 s before release (clock sync tolerance)
 
@@ -114,6 +122,7 @@ FIELDNAMES = [
     "nearest_defender_id", "nearest_defender_name",
     "contest_distance_ft", "closeout_speed_ft_s", "closeout_delta_ft_500ms",
     "contest_angle_deg", "hand_up_in", "shot_contest_quality",
+    "release_path_residual_in", "alteredness",
     # PBP outcome
     "pbp_shot_result", "pbp_conclusion_game_clock", "pbp_description",
     # QA / filters
@@ -838,6 +847,7 @@ UNMATCHED_FIELDNAMES = [
     # Tracking fields — populated for tracking_only, NA for pbp_only
     "release_frame", "release_game_clock", "release_shot_clock",
     "contest_distance_ft", "shot_contest_quality",
+    "release_path_residual_in", "alteredness",
     # PBP fields — populated for pbp_only, NA for tracking_only
     "pbp_shot_result", "pbp_conclusion_game_clock", "pbp_description",
 ]
@@ -983,6 +993,8 @@ def main() -> None:
                 "release_shot_clock":      r["release_shot_clock"],
                 "contest_distance_ft":     r["contest_distance_ft"],
                 "shot_contest_quality":    r["shot_contest_quality"],
+                "release_path_residual_in": r["release_path_residual_in"],
+                "alteredness":              r["alteredness"],
                 "pbp_shot_result":         NA,
                 "pbp_conclusion_game_clock": NA,
                 "pbp_description":         NA,
@@ -1007,6 +1019,8 @@ def main() -> None:
                 "release_shot_clock":      NA,
                 "contest_distance_ft":     NA,
                 "shot_contest_quality":    NA,
+                "release_path_residual_in": NA,
+                "alteredness":              NA,
                 "pbp_shot_result":         e["shot_result"],
                 "pbp_conclusion_game_clock": _sec_to_mmss(e["remaining_sec"]),
                 "pbp_description":         e["description"],
