@@ -8,11 +8,26 @@ MIT Sloan **Analytics Insights (15.285)** project. Processed Hawk-Eye parquet fi
 
 ```
 ├── scripts/
-│   ├── build_unified_shot_dataset.py   # End-to-end merge (tracking + PBP + QC columns)
-│   ├── opponent_three_pointers.py      # PBP clock alignment helper
-│   ├── load_parquet_from_onedrive.py   # Parquet inspection
-│   └── hawkeye_extract_opponent_3pa.py # Earlier extractor (reference)
-├── data/outputs/                       # Local pipeline outputs
+│   ├── pipeline/                       # Dataset construction + matching
+│   │   ├── build_unified_shot_dataset.py
+│   │   ├── opponent_three_pointers.py
+│   │   ├── load_parquet_from_onedrive.py
+│   │   ├── backfill_alteredness_from_parquet.py
+│   │   └── hawkeye_extract_opponent_3pa.py
+│   ├── visualization/                  # 3D rendering + animations
+│   │   ├── viz.py
+│   │   ├── shot_viz_from_dataset.py
+│   │   └── plot_release_snapshot_3d.py
+│   └── analysis/                       # Modeling and effect analysis
+│       ├── shot_alteredness.py
+│       ├── analyze_alteredness_metric.py
+│       ├── model_defensive_effectiveness.py
+│       ├── visualize_defensive_effectiveness.py
+│       └── explain_scq_drivers_by_defender.py
+├── notebooks/
+│   ├── vizualisation.ipynb
+│   └── shot_viz_from_dataset.ipynb
+├── data/outputs/                       # Local generated artifacts (gitignored)
 ├── requirements.txt
 └── README.md
 ```
@@ -29,7 +44,7 @@ pip install -r requirements.txt
 ## Run
 
 ```bash
-python scripts/build_unified_shot_dataset.py \
+python scripts/pipeline/build_unified_shot_dataset.py \
   --input-dir /path/to/processed_parquets \
   --output-csv data/outputs/shot_contest_dataset.csv
 ```
@@ -68,6 +83,25 @@ Companion filenames derive from `--output-csv` unless overridden (`--excluded-he
 | `--heave-min-ft-from-rim` | Exclude attempts beyond this arc distance from the attacking rim |
 | `--min-shot-clock-analysis`, `--desperate-shot-clock` | Shot-clock thresholds at release |
 | `--excluded-heaves-csv` | Custom path for heave audit extraction |
+
+## Visualization Workflow
+
+Generate release PNG + rotatable HTMLs from shot rows:
+
+```bash
+python scripts/visualization/shot_viz_from_dataset.py \
+  --shots-csv data/outputs/shot_contest_dataset.csv \
+  --parquet-dir /path/to/processed_parquets \
+  --row-indices 150 \
+  --pre-frames 120 \
+  --post-frames 6
+```
+
+Outputs are written to `data/outputs/shot_visualizations/<shot_id>/` with:
+- `release_snapshot_court.png`
+- `release_interactive.html`
+- `pre_release_animation.html`
+- `window_animation.html`
 
 ## Schema (high level)
 
