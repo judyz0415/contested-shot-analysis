@@ -9,6 +9,9 @@ LOCAL_NOTES.md
 data/outputs/
 data/archive/
 
+# Large upstream extract (exceeds GitHub file size limit).
+data/PlayerStatistics.csv
+
 # Python bytecode
 __pycache__/
 *.py[cod]

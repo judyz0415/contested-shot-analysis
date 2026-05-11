@@ -21,7 +21,6 @@ One row per opponent 3-point attempt. Columns:
     nearest_defender_id, nearest_defender_name
     contest_distance_ft, closeout_speed_ft_s, closeout_delta_ft_500ms
     contest_angle_deg, hand_up_in, shot_contest_quality
-    release_path_residual_in, alteredness  (pre-release path vs release-frame position)
 
   PBP outcome  (NBA CDN: matched within 5 s of release, same player+period)
     pbp_shot_result, pbp_conclusion_game_clock, pbp_description
@@ -50,6 +49,7 @@ import json
 import math
 import os
 import re
+import ssl
 import sys
 import time
 import urllib.request
@@ -62,7 +62,6 @@ if os.path.isdir(LOCAL_SITE):
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 if _SCRIPT_DIR not in sys.path:
     sys.path.insert(0, _SCRIPT_DIR)
-from shot_alteredness import path_residual_and_alteredness
 
 import numpy as np
 import pyarrow.compute as pc
@@ -78,8 +77,6 @@ RIM_Z = 120.0                               # 10 ft in inches
 THREEPT_MIN_INCHES = 264.0                  # ~22 ft; minimum distance for a 3PA
 RELEASE_Z_THRESHOLD = 90.0                  # ball must cross this height (inches) while rising
 APEX_SEARCH_FRAMES = 120                    # scan up to ~2 s after release for arc apex
-RELEASE_PATH_WINDOW_FRAMES = 12           # ~200 ms before release @ 60 Hz; linear extrapolation window
-ALTEREDNESS_REF_INCHES = 12.0              # residual (in); maps to alteredness 0–100 heuristic scale
 PBP_MATCH_WINDOW_SEC = 5.0                  # search up to 5 s after release in PBP
 PBP_CLOCK_BUFFER_SEC = 1.0                  # allow 1 s before release (clock sync tolerance)
 
@@ -122,7 +119,6 @@ FIELDNAMES = [
     "nearest_defender_id", "nearest_defender_name",
     "contest_distance_ft", "closeout_speed_ft_s", "closeout_delta_ft_500ms",
     "contest_angle_deg", "hand_up_in", "shot_contest_quality",
-    "release_path_residual_in", "alteredness",
     # PBP outcome
     "pbp_shot_result", "pbp_conclusion_game_clock", "pbp_description",
     # QA / filters
@@ -196,11 +192,38 @@ def _safe_clock_str(val) -> str:
 # PBP: fetch + parse
 # ---------------------------------------------------------------------------
 
-def _fetch_pbp(game_id: str) -> List[dict]:
+def _make_pbp_ssl_context(*, insecure: bool) -> Tuple[ssl.SSLContext, str]:
+    """
+    Build an SSL context that verifies the NBA CDN.
+
+    Order:
+      1) truststore — uses the OS trust store (macOS Keychain, Windows, etc.).
+         Fixes common python.org macOS installs where certifi alone still fails.
+      2) certifi — Mozilla CA bundle.
+      3) ssl.create_default_context() — last resort.
+    """
+    if insecure:
+        return ssl._create_unverified_context(), "disabled verification (INSECURE)"
+    try:
+        import truststore
+
+        return truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT), "truststore (OS trust store)"
+    except Exception:
+        pass
+    try:
+        import certifi
+
+        return ssl.create_default_context(cafile=certifi.where()), "certifi CA bundle"
+    except Exception:
+        pass
+    return ssl.create_default_context(), "ssl default context"
+
+
+def _fetch_pbp(game_id: str, *, ssl_context: ssl.SSLContext) -> List[dict]:
     url = PBP_URL.format(game_id=game_id)
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=30, context=ssl_context) as resp:
             return json.loads(resp.read())["game"]["actions"]
     except Exception as exc:
         print(f"  WARNING: PBP fetch failed for {game_id}: {exc}")
@@ -847,7 +870,6 @@ UNMATCHED_FIELDNAMES = [
     # Tracking fields — populated for tracking_only, NA for pbp_only
     "release_frame", "release_game_clock", "release_shot_clock",
     "contest_distance_ft", "shot_contest_quality",
-    "release_path_residual_in", "alteredness",
     # PBP fields — populated for pbp_only, NA for tracking_only
     "pbp_shot_result", "pbp_conclusion_game_clock", "pbp_description",
 ]
@@ -872,6 +894,11 @@ def main() -> None:
     parser.add_argument(
         "--pbp-delay", type=float, default=0.5,
         help="Seconds to wait between NBA CDN requests (default: 0.5).",
+    )
+    parser.add_argument(
+        "--insecure-pbp-ssl",
+        action="store_true",
+        help="Emergency only: skip TLS verification for NBA CDN (not recommended).",
     )
     parser.add_argument(
         "--no-pbp-rescue", action="store_true",
@@ -929,6 +956,9 @@ def main() -> None:
     heave_dist_in = float(args.heave_min_ft_from_rim) * 12.0
     rescue_enabled = not args.no_pbp_rescue
 
+    pbp_ssl, pbp_ssl_label = _make_pbp_ssl_context(insecure=args.insecure_pbp_ssl)
+    print(f"PBP HTTPS verification: {pbp_ssl_label}")
+
     all_rows:      List[dict] = []
     all_unmatched: List[dict] = []
 
@@ -945,7 +975,7 @@ def main() -> None:
         print(f"\n{basename}  [game {game_id}]")
 
         print(f"  Fetching PBP ...")
-        pbp_actions = _fetch_pbp(game_id)
+        pbp_actions = _fetch_pbp(game_id, ssl_context=pbp_ssl)
         pbp_events  = _parse_pbp_opponent_3pa(pbp_actions)
         print(f"  PBP: {len(pbp_events)} opponent 3PA events found")
 
@@ -993,8 +1023,6 @@ def main() -> None:
                 "release_shot_clock":      r["release_shot_clock"],
                 "contest_distance_ft":     r["contest_distance_ft"],
                 "shot_contest_quality":    r["shot_contest_quality"],
-                "release_path_residual_in": r["release_path_residual_in"],
-                "alteredness":              r["alteredness"],
                 "pbp_shot_result":         NA,
                 "pbp_conclusion_game_clock": NA,
                 "pbp_description":         NA,
@@ -1019,8 +1047,6 @@ def main() -> None:
                 "release_shot_clock":      NA,
                 "contest_distance_ft":     NA,
                 "shot_contest_quality":    NA,
-                "release_path_residual_in": NA,
-                "alteredness":              NA,
                 "pbp_shot_result":         e["shot_result"],
                 "pbp_conclusion_game_clock": _sec_to_mmss(e["remaining_sec"]),
                 "pbp_description":         e["description"],

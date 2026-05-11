@@ -1,7 +1,10 @@
+certifi
+truststore
 pandas
 numpy
 pyarrow
 matplotlib
 scipy
+scikit-learn
 plotly
 ipython

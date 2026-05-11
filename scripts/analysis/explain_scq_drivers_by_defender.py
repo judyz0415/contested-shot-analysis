@@ -13,6 +13,7 @@ SCQ formula from build_unified_shot_dataset.py:
 Outputs:
   - defender_scq_driver_breakdown.csv
   - defender_scq_recommendations.csv
+  - optional merged wide table via --final-csv (breakdown + coaching columns)
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from __future__ import annotations
 import argparse
 import csv
 import math
+import os
 from collections import defaultdict
 from typing import Dict, List, Tuple
 
@@ -85,6 +87,16 @@ def main() -> None:
     parser.add_argument("--csv", default="data/outputs/shot_contest_dataset.csv", help="Input shot dataset.")
     parser.add_argument("--out-dir", default="data/outputs", help="Output directory.")
     parser.add_argument("--min-shots", type=int, default=5, help="Minimum defender shots for report.")
+    parser.add_argument(
+        "--analysis-eligible-only",
+        action="store_true",
+        help="Restrict to rows with analysis_eligible=yes (requires column on CSV).",
+    )
+    parser.add_argument(
+        "--final-csv",
+        default=None,
+        help="Optional path for one merged CSV: breakdown means, pool diffs, and coaching columns.",
+    )
     args = parser.parse_args()
 
     agg = defaultdict(
@@ -115,6 +127,10 @@ def main() -> None:
             raise ValueError(f"Missing required columns: {missing}")
 
         for row in reader:
+            if args.analysis_eligible_only:
+                ae = (row.get("analysis_eligible") or "").strip().lower()
+                if ae != "yes":
+                    continue
             did = (row.get("nearest_defender_id") or "").strip()
             dnm = (row.get("nearest_defender_name") or "").strip()
             if not did or not dnm:
@@ -224,9 +240,48 @@ def main() -> None:
         w.writeheader()
         w.writerows(rec_rows)
 
+    if args.final_csv:
+        parent = os.path.dirname(os.path.abspath(args.final_csv))
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        merged_fields = [
+            "nearest_defender_id",
+            "nearest_defender_name",
+            "shots",
+            "mean_scq",
+            "distance_pts_mean",
+            "speed_pts_mean",
+            "angle_pts_mean",
+            "hand_pts_mean",
+            "distance_pts_diff_vs_pool",
+            "speed_pts_diff_vs_pool",
+            "angle_pts_diff_vs_pool",
+            "hand_pts_diff_vs_pool",
+            "primary_driver_up",
+            "primary_driver_down",
+            "coaching_drill_recommendation",
+            "film_focus_recommendation",
+        ]
+        merged: List[Dict[str, str]] = []
+        for br, rr in zip(breakdown_rows, rec_rows):
+            row_m = {**br, **{k: rr[k] for k in (
+                "primary_driver_up",
+                "primary_driver_down",
+                "coaching_drill_recommendation",
+                "film_focus_recommendation",
+            )}}
+            merged.append(row_m)
+        with open(args.final_csv, "w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=merged_fields)
+            w.writeheader()
+            w.writerows(merged)
+
     print("Wrote:")
     print(" ", out_breakdown)
     print(" ", out_recs)
+    if args.final_csv:
+        print(" ", args.final_csv)
+    print(f"Pool shots (rows aggregated): {int(pool['shots'])} | defenders (>={args.min_shots} contests): {len(breakdown_rows)}")
 
 
 if __name__ == "__main__":

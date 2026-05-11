@@ -1,0 +1,96 @@
+PBP HTTPS verification: disabled verification (INSECURE)
+
+nba_game_0022500062_processed.parquet  [game 0022500062]
+  Fetching PBP ...
+  PBP: 42 opponent 3PA events found
+  Tracking rows: 45 | PBP matched rows: 41 | pbp_rescued: 8 | analysis_eligible: 41
+  Unmatched implied: tracking_only 4 | pbp_only 1
+
+nba_game_0022500296_processed.parquet  [game 0022500296]
+  Fetching PBP ...
+  PBP: 26 opponent 3PA events found
+  Tracking rows: 27 | PBP matched rows: 26 | pbp_rescued: 4 | analysis_eligible: 26
+  Unmatched implied: tracking_only 1 | pbp_only 0
+
+nba_game_0022500313_processed.parquet  [game 0022500313]
+  Fetching PBP ...
+  PBP: 29 opponent 3PA events found
+  Tracking rows: 27 | PBP matched rows: 26 | pbp_rescued: 5 | analysis_eligible: 26
+  Unmatched implied: tracking_only 1 | pbp_only 3
+
+nba_game_0022500332_processed.parquet  [game 0022500332]
+  Fetching PBP ...
+  PBP: 32 opponent 3PA events found
+  Tracking rows: 35 | PBP matched rows: 31 | pbp_rescued: 7 | analysis_eligible: 31
+  Unmatched implied: tracking_only 4 | pbp_only 1
+
+nba_game_0022500513_processed.parquet  [game 0022500513]
+  Fetching PBP ...
+  PBP: 39 opponent 3PA events found
+  Tracking rows: 42 | PBP matched rows: 39 | pbp_rescued: 9 | analysis_eligible: 39
+  Unmatched implied: tracking_only 3 | pbp_only 0
+
+nba_game_0022500553_processed.parquet  [game 0022500553]
+  Fetching PBP ...
+  PBP: 34 opponent 3PA events found
+  Tracking rows: 37 | PBP matched rows: 34 | pbp_rescued: 5 | analysis_eligible: 34
+  Unmatched implied: tracking_only 3 | pbp_only 0
+
+nba_game_0022500564_processed.parquet  [game 0022500564]
+  Fetching PBP ...
+  PBP: 48 opponent 3PA events found
+  Tracking rows: 48 | PBP matched rows: 44 | pbp_rescued: 12 | analysis_eligible: 44
+  Unmatched implied: tracking_only 4 | pbp_only 4
+
+nba_game_0022500864_processed.parquet  [game 0022500864]
+  Fetching PBP ...
+  PBP: 36 opponent 3PA events found
+  Tracking rows: 30 | PBP matched rows: 27 | pbp_rescued: 6 | analysis_eligible: 27
+  Unmatched implied: tracking_only 3 | pbp_only 9
+
+nba_game_0022500886_processed.parquet  [game 0022500886]
+  Fetching PBP ...
+  PBP: 32 opponent 3PA events found
+  Tracking rows: 34 | PBP matched rows: 31 | pbp_rescued: 9 | analysis_eligible: 31
+  Unmatched implied: tracking_only 3 | pbp_only 1
+
+nba_game_0022500901_processed.parquet  [game 0022500901]
+  Fetching PBP ...
+  PBP: 41 opponent 3PA events found
+  Tracking rows: 40 | PBP matched rows: 39 | pbp_rescued: 5 | analysis_eligible: 39
+  Unmatched implied: tracking_only 1 | pbp_only 2
+
+nba_game_0022501055_processed.parquet  [game 0022501055]
+  Fetching PBP ...
+  PBP: 37 opponent 3PA events found
+  Tracking rows: 35 | PBP matched rows: 31 | pbp_rescued: 6 | analysis_eligible: 30
+  Unmatched implied: tracking_only 4 | pbp_only 6
+
+nba_game_0022501083_processed.parquet  [game 0022501083]
+  Fetching PBP ...
+  PBP: 39 opponent 3PA events found
+  Tracking rows: 45 | PBP matched rows: 39 | pbp_rescued: 7 | analysis_eligible: 39
+  Unmatched implied: tracking_only 6 | pbp_only 0
+
+nba_game_0022501091_processed.parquet  [game 0022501091]
+  Fetching PBP ...
+  PBP: 38 opponent 3PA events found
+  Tracking rows: 41 | PBP matched rows: 34 | pbp_rescued: 8 | analysis_eligible: 34
+  Unmatched implied: tracking_only 7 | pbp_only 4
+
+nba_game_0022501106_processed.parquet  [game 0022501106]
+  Fetching PBP ...
+  PBP: 44 opponent 3PA events found
+  Tracking rows: 45 | PBP matched rows: 42 | pbp_rescued: 5 | analysis_eligible: 42
+  Unmatched implied: tracking_only 3 | pbp_only 2
+
+nba_game_0022501201_processed.parquet  [game 0022501201]
+  Fetching PBP ...
+  PBP: 32 opponent 3PA events found
+  Tracking rows: 30 | PBP matched rows: 26 | pbp_rescued: 6 | analysis_eligible: 26
+  Unmatched implied: tracking_only 4 | pbp_only 6
+
+Main dataset : 561 rows (510 matched) -> data/intermediate/shot_contest_dataset.csv
+Eligible     : 509 rows (analysis_eligible=yes)
+Excluded heaves audit: 4 rows -> data/intermediate/shot_contest_dataset_excluded_heaves.csv
+Unmatched    : 90 rows (51 tracking_only, 39 pbp_only) -> data/intermediate/shot_contest_dataset_unmatched.csv

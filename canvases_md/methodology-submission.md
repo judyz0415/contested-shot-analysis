@@ -7,9 +7,9 @@ We quantify perimeter defensive effectiveness on opponent three-point attempts b
 ## Snapshot Metrics
 
 - **Games:** 15
-- **Tracked 3PA:** 459
-- **Modeled Shots:** 399
-- **Outcome Label:** Made / Missed
+- **Eligible contests (analysis pool):** 509 opponent 3PA rows with Hawk-Eye contest fields and modeling eligibility flags
+- **SCQ defender reports:** 12 Heat players as nearest contestant on ≥5 eligible attempts
+- **Outcome Label:** Made / Missed (when play-by-play matched)
 
 ---
 
@@ -33,6 +33,8 @@ Shot Contest Quality (SCQ) is a bounded heuristic score on [0,100] computed at r
 `SCQ = 100 x [0.35 * f(distance) + 0.30 * f(speed) + 0.20 * f(angle) + 0.15 * f(hand-up)]`
 
 Each component is clipped to a physically meaningful range. SCQ is interpreted as process quality, not direct outcome probability.
+
+Per-defender SCQ decomposition (means, implied points by driver, deltas vs the eligible-shot pool, scripted coaching cues) is exported as **`data/outputs/heat_defender_scq_breakdown_final.csv`** for Heat defenders with at least five eligible contests.
 
 ---
 
