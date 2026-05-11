@@ -25,7 +25,8 @@ One row per opponent 3-point attempt. Columns:
 
   PBP outcome  (NBA CDN: matched within 5 s of release, same player+period)
     pbp_shot_result, pbp_conclusion_game_clock, pbp_description
-    (all three are "NA" when no PBP event matches)
+    outcome_last_frame  — tracking frame aligned to conclusion clock / default tail (~3 s) if unmatched
+    (pbp_* are "NA" when no PBP event matches)
 
   QA filters  (automatic tags — tune via CLI constants)
     pbp_rescued — secondary pass anchored on PBP resolution clock + shooter
@@ -98,6 +99,12 @@ DESPERATE_SHOT_CLOCK_SEC = 0.8                     # always exclude at or below 
 # Heuristic flag when apex never reaches typical jumper height — possible lob / mis-tagged pass.
 LOW_ARC_APEX_Z_INCHES = 158.0
 
+# Full-shot viz tail when PBP/outcome timing is unavailable (~3 s @ 60 Hz).
+OUTCOME_TAIL_FRAMES_NO_METADATA = 180
+
+# Ceiling on outcome frame search past release (~15 s).
+OUTCOME_LAST_FRAME_MAX_EXTEND = 900
+
 MIAMI_TEAM_ID = 1610612748
 PBP_URL = "https://cdn.nba.com/static/json/liveData/playbyplay/playbyplay_{game_id}.json"
 NA = "NA"
@@ -123,8 +130,9 @@ FIELDNAMES = [
     "contest_distance_ft", "closeout_speed_ft_s", "closeout_delta_ft_500ms",
     "contest_angle_deg", "hand_up_in", "shot_contest_quality",
     "release_path_residual_in", "alteredness",
-    # PBP outcome
+    # PBP outcome (+ tracking frame aligned to conclusion for viz/export)
     "pbp_shot_result", "pbp_conclusion_game_clock", "pbp_description",
+    "outcome_last_frame",
     # QA / filters
     "pbp_rescued",              # yes = recovered from pbp_only via clock-targeted search
     "analysis_eligible",        # yes if row should enter outcome+contest modeling
@@ -190,6 +198,56 @@ def _safe_clock_str(val) -> str:
         return NA
     s = str(val).strip()
     return s if s and s not in ("None", "nan") else NA
+
+
+def _outcome_last_tracking_frame_numpy(
+    frames: np.ndarray,
+    periods: np.ndarray,
+    game_clks: np.ndarray,
+    release_idx: int,
+    shot_period: int,
+    conclusion_remaining_sec: float,
+    *,
+    clock_tol_sec: float = 3.0,
+    default_tail_frames: int = OUTCOME_TAIL_FRAMES_NO_METADATA,
+    max_extend: int = OUTCOME_LAST_FRAME_MAX_EXTEND,
+) -> int:
+    """
+    Last Hawk-Eye frame for full-shot viz: through PBP-listed remaining clock, else ~3 s after release.
+
+    ``conclusion_remaining_sec`` is NBA quarter countdown seconds (matches parquet gameClock parsing).
+    """
+    mx_all = int(np.max(frames))
+    rf = int(frames[release_idx])
+    fb_fallback = min(rf + default_tail_frames, mx_all)
+
+    if math.isnan(conclusion_remaining_sec):
+        return min(fb_fallback, rf + max_extend, mx_all)
+
+    best_gate: Optional[int] = None
+    best_nearest_frame = rf
+    best_nearest_err = float("inf")
+
+    for j in range(release_idx, len(frames)):
+        if int(periods[j]) != shot_period:
+            continue
+        gsm = _parquet_clock_to_sec(_safe_clock_str(game_clks[j]))
+        if math.isnan(gsm):
+            continue
+        if gsm <= conclusion_remaining_sec + clock_tol_sec:
+            best_gate = int(frames[j])
+        err = abs(gsm - conclusion_remaining_sec)
+        if err < best_nearest_err:
+            best_nearest_err = err
+            best_nearest_frame = int(frames[j])
+
+    if best_gate is not None:
+        fh = max(rf, min(best_gate, rf + max_extend, mx_all))
+        return fh
+    fh2 = max(rf, min(best_nearest_frame, rf + max_extend, mx_all))
+    if fh2 < fb_fallback:
+        fh2 = min(fb_fallback, rf + max_extend, mx_all)
+    return fh2
 
 
 # ---------------------------------------------------------------------------
@@ -531,22 +589,29 @@ def _build_row_for_release_index(
     release_sec = _parquet_clock_to_sec(release_game_clock)
 
     pbp_idx = -1
+    conclusion_remaining_sec = float("nan")
     if forced_pbp is not None:
         pbp, pbp_idx = forced_pbp
         pbp_result = pbp["shot_result"]
         pbp_clock = _sec_to_mmss(pbp["remaining_sec"])
         pbp_desc = pbp["description"]
+        conclusion_remaining_sec = float(pbp["remaining_sec"])
     else:
         pbp, pbp_idx = _match_pbp(pbp_events, shooter_id, period, release_sec)
         if pbp:
             pbp_result = pbp["shot_result"]
             pbp_clock = _sec_to_mmss(pbp["remaining_sec"])
             pbp_desc = pbp["description"]
+            conclusion_remaining_sec = float(pbp["remaining_sec"])
         else:
             pbp_idx = -1
             pbp_result = NA
             pbp_clock = NA
             pbp_desc = NA
+
+    outcome_last_frame = _outcome_last_tracking_frame_numpy(
+        frames, periods, game_clks, i, period, conclusion_remaining_sec
+    )
 
     row = {
         "game_file": os.path.basename(path),
@@ -581,6 +646,7 @@ def _build_row_for_release_index(
         "pbp_shot_result": pbp_result,
         "pbp_conclusion_game_clock": pbp_clock,
         "pbp_description": pbp_desc,
+        "outcome_last_frame": int(outcome_last_frame),
         "pbp_rescued": pbp_rescued_flag,
         "analysis_eligible": NA,
         "exclusion_reason": NA,

@@ -526,8 +526,9 @@ def create_plotly_anim(df, ball_column='ball', joint_connections=limb_names, tit
             xaxis=dict(title='X'),
             yaxis=dict(title='Y'),
             zaxis=dict(title='Z'),
-            aspectmode='manual',
-            aspectratio=dict(x=3, y=2, z=1)
+            # Use real Hawk-Eye inch proportions (court vs player height ~7ft vertical).
+            # Manual aspectratio distorted Z vs XY; exported HTML/visuals use dataspace sizing.
+            aspectmode='data',
         ),
         title=title,
         updatemenus=[

@@ -46,7 +46,7 @@ pip install -r requirements.txt
 ```bash
 python scripts/pipeline/build_unified_shot_dataset.py \
   --input-dir /path/to/processed_parquets \
-  --output-csv data/outputs/shot_contest_dataset.csv
+  --output-csv data/outputs/datasets/shot_contest_dataset.csv
 ```
 
 The merge script pulls play-by-play from the NBA CDN (`cdn.nba.com`) using each game’s ID from the filename.
@@ -65,7 +65,7 @@ The merge script pulls play-by-play from the NBA CDN (`cdn.nba.com`) using each 
 
 | Artifact | Description |
 |----------|-------------|
-| `shot_contest_dataset.csv` | One row per tracking-backed attempt with contest features and PBP fields |
+| `data/outputs/datasets/shot_contest_dataset.csv` | One row per tracking-backed attempt with contest features and PBP fields |
 | `shot_contest_dataset_unmatched.csv` | `tracking_only` vs `pbp_only` diagnostics after rescue |
 | `shot_contest_dataset_excluded_heaves.csv` | Rows excluded primarily for distance or clock rules |
 
@@ -90,14 +90,14 @@ Generate release PNG + rotatable HTMLs from shot rows:
 
 ```bash
 python scripts/visualization/shot_viz_from_dataset.py \
-  --shots-csv data/outputs/shot_contest_dataset.csv \
+  --shots-csv data/outputs/datasets/shot_contest_dataset.csv \
   --parquet-dir /path/to/processed_parquets \
   --row-indices 150 \
   --pre-frames 120 \
   --post-frames 6
 ```
 
-Outputs are written to `data/outputs/shot_visualizations/<shot_id>/` with:
+Outputs are written to `data/outputs/visualizations/shot_sequences/runs/<shot_id>/` with:
 - `release_snapshot_court.png`
 - `release_interactive.html`
 - `pre_release_animation.html`
