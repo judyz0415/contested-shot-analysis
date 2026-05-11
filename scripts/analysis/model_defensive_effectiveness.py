@@ -23,7 +23,7 @@ import math
 import random
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Dict, List, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 
 NA_TOKENS = {"", "NA", "NAN", "NONE", "NULL"}
@@ -219,6 +219,46 @@ def _volume_normalized_lift(made: float, exp_makes: float, shots: int, prior_sho
     return (made - exp_makes) / (shots + prior_shots)
 
 
+def _load_shrink_shooter_3pt_priors(
+    path: str, *, pseudo_attempts: float = 50.0
+) -> Tuple[Dict[int, float], float]:
+    """
+    2025-26 regular season (from Oct 2025), Beta-style shrink toward league 3P%.
+    Returns (person_id -> shrunk pct, league_pct).
+    """
+    tpm: Dict[int, float] = {}
+    tpa: Dict[int, float] = {}
+    with open(path, "r", newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if (row.get("gameType") or "").strip() != "Regular Season":
+                continue
+            gd = (row.get("gameDate") or "").strip()
+            if len(gd) >= 10 and gd[:10] < "2025-10-01":
+                continue
+            pid_raw = (row.get("personId") or "").strip()
+            if not pid_raw:
+                continue
+            pid = int(pid_raw)
+            ta = _to_float(row.get("threePointersAttempted", ""))
+            tm = _to_float(row.get("threePointersMade", ""))
+            if not math.isfinite(ta) or not math.isfinite(tm):
+                continue
+            tpa[pid] = tpa.get(pid, 0.0) + ta
+            tpm[pid] = tpm.get(pid, 0.0) + tm
+
+    league_tpa = sum(tpa.values())
+    league_tpm = sum(tpm.values())
+    league_pct = league_tpm / league_tpa if league_tpa > 1e-9 else 0.36
+
+    priors: Dict[int, float] = {}
+    k = pseudo_attempts
+    for pid, att in tpa.items():
+        made = tpm.get(pid, 0.0)
+        priors[pid] = (made + k * league_pct) / (att + k)
+    return priors, league_pct
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Model defender effectiveness as lift vs baseline.")
     parser.add_argument(
@@ -243,6 +283,21 @@ def main() -> None:
         default=25.0,
         help="Pseudo-shot prior for volume-normalized defender lift.",
     )
+    parser.add_argument(
+        "--analysis-eligible-only",
+        action="store_true",
+        help="Keep rows where analysis_eligible=yes (requires column on shot CSV).",
+    )
+    parser.add_argument(
+        "--player-statistics-csv",
+        default="data/PlayerStatistics.csv",
+        help="Used to fill shooter_2025_26_regular_3pt_pct when missing from shot CSV.",
+    )
+    parser.add_argument(
+        "--heat-defender-lift-final-csv",
+        default=None,
+        help="Optional slim CSV: defender lift vs baseline (raw + volume-normalized).",
+    )
     args = parser.parse_args()
 
     baseline_numeric_cols = [
@@ -250,7 +305,6 @@ def main() -> None:
         "shooter_dist_to_rim_in",
         "release_ball_z",
         "apex_ball_z",
-        "release_path_residual_in",
         "release_shot_clock",
     ]
     contest_numeric_cols = [
@@ -276,10 +330,28 @@ def main() -> None:
             + ["pbp_shot_result", "nearest_defender_id", "nearest_defender_name", "shooter_id", "shooter_name"]
         )
         missing = [c for c in required if reader.fieldnames is None or c not in reader.fieldnames]
+        merge_shooter = "shooter_2025_26_regular_3pt_pct" in missing
+        if merge_shooter:
+            missing = [c for c in missing if c != "shooter_2025_26_regular_3pt_pct"]
         if missing:
             raise ValueError(f"Missing required columns in input CSV: {missing}")
 
+        priors: Optional[Dict[int, float]] = None
+        league_pct = 0.36
+        if merge_shooter:
+            priors, league_pct = _load_shrink_shooter_3pt_priors(args.player_statistics_csv)
+
         for row in reader:
+            if args.analysis_eligible_only:
+                if (row.get("analysis_eligible") or "").strip().lower() != "yes":
+                    continue
+            if merge_shooter and priors is not None:
+                sid = (row.get("shooter_id") or "").strip()
+                if not sid:
+                    continue
+                pct = priors.get(int(sid), league_pct)
+                row["shooter_2025_26_regular_3pt_pct"] = f"{pct:.8f}"
+
             yi = _made_binary(row.get("pbp_shot_result", ""))
             if not math.isfinite(yi):
                 continue
@@ -437,11 +509,43 @@ def main() -> None:
     _write_csv(out_cal_base, ["bin", "n", "pred_mean", "obs_rate", "pred_min", "pred_max"], cal_base)
     _write_csv(out_cal_full, ["bin", "n", "pred_mean", "obs_rate", "pred_min", "pred_max"], cal_full)
 
+    if args.heat_defender_lift_final_csv:
+        slim: List[Dict[str, str]] = []
+        for r in defender_rows:
+            slim.append(
+                {
+                    "nearest_defender_id": r["nearest_defender_id"],
+                    "nearest_defender_name": r["nearest_defender_name"],
+                    "shots": r["shots"],
+                    "actual_make_rate": r["actual_make_rate"],
+                    "baseline_expected_make_rate": r["baseline_expected_make_rate"],
+                    "raw_lift_vs_baseline": r["lift_vs_baseline_rate"],
+                    "volume_normalized_lift": r["volume_normalized_lift_rate"],
+                    "shrinkage_prior_shots": f"{args.shrinkage_prior_shots:.1f}",
+                }
+            )
+        _write_csv(
+            args.heat_defender_lift_final_csv,
+            [
+                "nearest_defender_id",
+                "nearest_defender_name",
+                "shots",
+                "actual_make_rate",
+                "baseline_expected_make_rate",
+                "raw_lift_vs_baseline",
+                "volume_normalized_lift",
+                "shrinkage_prior_shots",
+            ],
+            slim,
+        )
+
     print("\nWrote:")
     print(" ", out_shots)
     print(" ", out_defs)
     print(" ", out_cal_base)
     print(" ", out_cal_full)
+    if args.heat_defender_lift_final_csv:
+        print(" ", args.heat_defender_lift_final_csv)
 
 
 if __name__ == "__main__":

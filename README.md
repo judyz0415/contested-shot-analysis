@@ -12,15 +12,12 @@ MIT Sloan **Analytics Insights (15.285)** project. Processed Hawk-Eye parquet fi
 │   │   ├── build_unified_shot_dataset.py
 │   │   ├── opponent_three_pointers.py
 │   │   ├── load_parquet_from_onedrive.py
-│   │   ├── backfill_alteredness_from_parquet.py
 │   │   └── hawkeye_extract_opponent_3pa.py
 │   ├── visualization/                  # 3D rendering + animations
 │   │   ├── viz.py
 │   │   ├── shot_viz_from_dataset.py
 │   │   └── plot_release_snapshot_3d.py
 │   └── analysis/                       # Modeling and effect analysis
-│       ├── shot_alteredness.py
-│       ├── analyze_alteredness_metric.py
 │       ├── model_defensive_effectiveness.py
 │       ├── visualize_defensive_effectiveness.py
 │       └── explain_scq_drivers_by_defender.py
@@ -49,7 +46,7 @@ python scripts/pipeline/build_unified_shot_dataset.py \
   --output-csv data/outputs/datasets/shot_contest_dataset.csv
 ```
 
-The merge script pulls play-by-play from the NBA CDN (`cdn.nba.com`) using each game’s ID from the filename.
+The merge script pulls play-by-play from the NBA CDN (`cdn.nba.com`) using each game’s ID from the filename. TLS verification uses the **`truststore`** package (OS trust store, e.g. macOS Keychain) with fallbacks to **certifi** and the default SSL context. Run `pip install -r requirements.txt` so PBP fetches verify correctly. Use `--insecure-pbp-ssl` only as an emergency workaround.
 
 ## Methodology
 
@@ -83,6 +80,7 @@ Companion filenames derive from `--output-csv` unless overridden (`--excluded-he
 | `--heave-min-ft-from-rim` | Exclude attempts beyond this arc distance from the attacking rim |
 | `--min-shot-clock-analysis`, `--desperate-shot-clock` | Shot-clock thresholds at release |
 | `--excluded-heaves-csv` | Custom path for heave audit extraction |
+| `--insecure-pbp-ssl` | Emergency only: disable TLS verification for PBP (avoid if possible) |
 
 ## Visualization Workflow
 

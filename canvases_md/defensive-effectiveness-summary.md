@@ -1,80 +1,86 @@
 # Defensive Effectiveness Summary
 
-Baseline model uses shooter skill + shot context. Full model adds contest features and defender identity with ridge shrinkage. Defender ranking below uses volume-normalized lift so low-sample defenders are pulled toward neutral (0).
+SCQ (Shot Contest Quality) summarizes Hawk-Eye contest geometry at release into a 0–100 score. The tables below use **analysis-eligible** opponent three-point attempts only (**509** contests across **15** games). **Pool deltas** compare each defender’s average implied SCQ points per driver (distance, speed, angle, hand) to the mean over all **509** eligible rows.
+
+**Deliverable:** merged breakdown + coaching strings → `data/outputs/heat_defender_scq_breakdown_final.csv`  
+**Threshold:** nearest Heat defender with **≥5** eligible contested 3s → **12** players.
 
 ---
 
-## Snapshot Metrics
+## Snapshot
 
-- **Shots Modeled:** 399
-- **Overall Make Rate:** 47.1%
-- **Baseline Logloss:** 0.6818
-- **Full Logloss:** 0.6568
-
-> **Heat-facing interpretation**  
-> For front office and coaching decisions, prioritize volume-normalized lift and shot volume together. This avoids overreacting to very small samples while still capturing true suppression signal.
-
----
-
-## Volume-Normalized Defender Effectiveness
-
-| Defender | Shots | Raw lift | Normalized lift | Takeaway |
-|---|---:|---:|---:|---|
-| Bam Adebayo | 44 | -0.120 | -0.077 | Most reliable suppression profile in sample |
-| Nikola Jovic | 8 | -0.203 | -0.049 | Promising but low-volume; monitor, avoid overconfidence |
-| Norman Powell | 22 | -0.091 | -0.043 | Moderate positive suppression signal |
-| Pelle Larsson | 47 | +0.078 | +0.051 | Sustained over-baseline makes allowed |
-| Jaime Jaquez Jr. | 46 | +0.095 | +0.062 | Needs targeted closeout/angle adjustment |
-| Davion Mitchell | 57 | +0.109 | +0.076 | Largest adverse lift in this sample |
+| Metric | Value |
+|--------|------:|
+| Games | 15 |
+| Eligible contests (pool) | 509 |
+| Heat defenders (≥5 contests) | 12 |
+| Pool mean SCQ | 47.93 |
 
 ---
 
-## SCQ Driver Breakdown (Heat Defenders)
+## SCQ driver breakdown (mean SCQ and Δ vs pool)
 
-Positive values indicate this component contributes more SCQ points than the Heat defender pool average; negative values indicate a drag on that defender's SCQ.
+Positive Δ = more contribution from that driver than the pool average (in SCQ points on the same 0–100 construction).
 
-| Defender | Shots | Dist vs pool | Speed vs pool | Angle vs pool | Hand vs pool |
-|---|---:|---:|---:|---:|---:|
-| Davion Mitchell | 63 | +2.47 | +1.85 | -0.06 | -0.01 |
-| Bam Adebayo | 55 | -2.45 | -3.01 | -0.14 | +0.84 |
-| Jaime Jaquez Jr. | 53 | +0.46 | +1.12 | +0.18 | -0.02 |
-| Tyler Herro | 49 | +0.41 | +0.77 | -0.03 | -1.72 |
-| Pelle Larsson | 55 | -0.16 | -0.16 | +0.00 | -0.31 |
-| Nikola Jovic | 10 | +2.03 | -0.40 | -0.14 | +1.99 |
-
----
-
-## SCQ Coaching Recommendations
-
-| Defender | Primary score drag | Action recommendation |
-|---|---|---|
-| Bam Adebayo | Speed and distance | Higher starting position + first-step acceleration closeout reps |
-| Tyler Herro | Hand timing | Early high-hand at gather; drill no-dip hand timing into contests |
-| Jaime Jaquez Jr. | Hand timing | Preserve speed but raise/earlier hand to convert pressure into SCQ |
-| Pelle Larsson | Hand and speed | Pair hand-up timing cues with urgency benchmarks in shell closeouts |
-| Nikola Jovic | Speed (low sample) | Keep distance/hand gains; focus on first two steps and angle control |
-| Davion Mitchell | Angle | Maintain pressure profile while reducing side-angle/fly-by contests |
+| Defender | Shots | Mean SCQ | Dist Δ | Speed Δ | Angle Δ | Hand Δ |
+|----------|------:|---------:|-------:|--------:|--------:|-------:|
+| Andrew Wiggins | 88 | 47.05 | −0.38 | −0.97 | +0.03 | +0.43 |
+| Davion Mitchell | 72 | 51.61 | +1.78 | +2.21 | −0.12 | −0.19 |
+| Pelle Larsson | 61 | 48.80 | +0.38 | +0.36 | −0.09 | +0.22 |
+| Bam Adebayo | 57 | 42.15 | −2.81 | −3.37 | −0.20 | +0.60 |
+| Jaime Jaquez Jr. | 57 | 49.03 | +0.75 | +0.36 | +0.11 | −0.12 |
+| Tyler Herro | 47 | 46.45 | +0.23 | +0.26 | −0.08 | −1.89 |
+| Dru Smith | 26 | 56.10 | +3.19 | +3.66 | +0.55 | +0.76 |
+| Norman Powell | 25 | 43.14 | −1.29 | −2.18 | −0.20 | −1.12 |
+| Kel'el Ware | 20 | 43.93 | −3.41 | −1.30 | −0.20 | +0.91 |
+| Kasparas Jakucionis | 20 | 48.68 | +0.69 | −0.63 | +0.27 | +0.43 |
+| Simone Fontecchio | 18 | 48.51 | −1.35 | +3.55 | −0.20 | −1.42 |
+| Nikola Jovic | 13 | 49.44 | +0.91 | −2.03 | +1.05 | +1.59 |
 
 ---
 
-## Heat Recommendations
+## Leverage vs pool (strongest / weakest SCQ drivers)
 
-| Audience | Recommendation | Why it matters |
-|---|---|---|
-| Front Office | Use normalized lift + shots as the main defensive contest KPI. | Stabilizes evaluation across uneven workloads and avoids small-sample noise. |
-| Coaching Staff | Prioritize film + drill work for high-volume positive-lift defenders. | Largest practical gain opportunity comes from frequent contest reps. |
-| Players | For Jaquez/Larsson/Mitchell contests, emphasize angle and hand-up timing. | Model coefficients suggest better contest geometry lowers make odds. |
-| Rotation Planning | Lean late-game high-leverage 3PT contests toward strongest normalized suppressors. | Improves expected opponent shot outcomes versus baseline shot quality. |
+| Defender | Strongest vs pool | Weakest vs pool |
+|----------|-------------------|-----------------|
+| Andrew Wiggins | hand | speed |
+| Davion Mitchell | speed | hand |
+| Pelle Larsson | distance | angle |
+| Bam Adebayo | hand | speed |
+| Jaime Jaquez Jr. | distance | hand |
+| Tyler Herro | speed | hand |
+| Dru Smith | speed | angle |
+| Norman Powell | angle | speed |
+| Kel'el Ware | hand | distance |
+| Kasparas Jakucionis | distance | speed |
+| Simone Fontecchio | speed | hand |
+| Nikola Jovic | hand | speed |
+
+Full drill and film cues (same logic as the script’s recommendation helper) are in **`heat_defender_scq_breakdown_final.csv`** columns `coaching_drill_recommendation` and `film_focus_recommendation`.
 
 ---
 
-## Generated Visuals and Data Artifacts
+## Outcome modeling (separate path)
 
-- `data/outputs/viz_defender_lift_vs_baseline.png`
-- `data/outputs/viz_defender_lift_volume_normalized.png`
-- `data/outputs/viz_calibration_baseline_vs_full.png`
-- `data/outputs/viz_probability_shift_base_vs_full.png`
+Residual **lift vs shooter-context baseline** (ridge logit) is produced by `scripts/analysis/model_defensive_effectiveness.py` when the shot CSV includes the baseline feature columns that script expects. Regenerate artifacts under `data/outputs/` after updating the unified dataset.
+
+---
+
+## Generated artifacts
+
+- **`data/outputs/heat_defender_scq_breakdown_final.csv`** — primary SCQ export (means, components, pool diffs, coaching strings).
 - `data/outputs/defender_scq_driver_breakdown.csv`
 - `data/outputs/defender_scq_recommendations.csv`
+- `data/outputs/viz_defender_lift_vs_baseline.png` (when the effectiveness model is run)
+- `data/outputs/viz_defender_lift_volume_normalized.png`
 
-Calibration CSVs and shot-level lift outputs remain in `data/outputs/` for downstream modeling and reporting.
+Regenerate SCQ tables:
+
+```bash
+python scripts/analysis/explain_scq_drivers_by_defender.py \
+  --csv data/intermediate/shot_contest_dataset.csv \
+  --out-dir data/outputs \
+  --min-shots 5 \
+  --analysis-eligible-only \
+  --final-csv data/outputs/heat_defender_scq_breakdown_final.csv
+```

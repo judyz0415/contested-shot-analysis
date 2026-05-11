@@ -21,12 +21,10 @@ One row per opponent 3-point attempt. Columns:
     nearest_defender_id, nearest_defender_name
     contest_distance_ft, closeout_speed_ft_s, closeout_delta_ft_500ms
     contest_angle_deg, hand_up_in, shot_contest_quality
-    release_path_residual_in, alteredness  (pre-release path vs release-frame position)
 
   PBP outcome  (NBA CDN: matched within 5 s of release, same player+period)
     pbp_shot_result, pbp_conclusion_game_clock, pbp_description
-    outcome_last_frame  — tracking frame aligned to conclusion clock / default tail (~3 s) if unmatched
-    (pbp_* are "NA" when no PBP event matches)
+    (all three are "NA" when no PBP event matches)
 
   QA filters  (automatic tags — tune via CLI constants)
     pbp_rescued — secondary pass anchored on PBP resolution clock + shooter
@@ -51,6 +49,7 @@ import json
 import math
 import os
 import re
+import ssl
 import sys
 import time
 import urllib.request
@@ -63,7 +62,6 @@ if os.path.isdir(LOCAL_SITE):
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 if _SCRIPT_DIR not in sys.path:
     sys.path.insert(0, _SCRIPT_DIR)
-from shot_alteredness import path_residual_and_alteredness
 
 import numpy as np
 import pyarrow.compute as pc
@@ -79,8 +77,6 @@ RIM_Z = 120.0                               # 10 ft in inches
 THREEPT_MIN_INCHES = 264.0                  # ~22 ft; minimum distance for a 3PA
 RELEASE_Z_THRESHOLD = 90.0                  # ball must cross this height (inches) while rising
 APEX_SEARCH_FRAMES = 120                    # scan up to ~2 s after release for arc apex
-RELEASE_PATH_WINDOW_FRAMES = 12           # ~200 ms before release @ 60 Hz; linear extrapolation window
-ALTEREDNESS_REF_INCHES = 12.0              # residual (in); maps to alteredness 0–100 heuristic scale
 PBP_MATCH_WINDOW_SEC = 5.0                  # search up to 5 s after release in PBP
 PBP_CLOCK_BUFFER_SEC = 1.0                  # allow 1 s before release (clock sync tolerance)
 
@@ -98,12 +94,6 @@ DESPERATE_SHOT_CLOCK_SEC = 0.8                     # always exclude at or below 
 
 # Heuristic flag when apex never reaches typical jumper height — possible lob / mis-tagged pass.
 LOW_ARC_APEX_Z_INCHES = 158.0
-
-# Full-shot viz tail when PBP/outcome timing is unavailable (~3 s @ 60 Hz).
-OUTCOME_TAIL_FRAMES_NO_METADATA = 180
-
-# Ceiling on outcome frame search past release (~15 s).
-OUTCOME_LAST_FRAME_MAX_EXTEND = 900
 
 MIAMI_TEAM_ID = 1610612748
 PBP_URL = "https://cdn.nba.com/static/json/liveData/playbyplay/playbyplay_{game_id}.json"
@@ -129,10 +119,8 @@ FIELDNAMES = [
     "nearest_defender_id", "nearest_defender_name",
     "contest_distance_ft", "closeout_speed_ft_s", "closeout_delta_ft_500ms",
     "contest_angle_deg", "hand_up_in", "shot_contest_quality",
-    "release_path_residual_in", "alteredness",
-    # PBP outcome (+ tracking frame aligned to conclusion for viz/export)
+    # PBP outcome
     "pbp_shot_result", "pbp_conclusion_game_clock", "pbp_description",
-    "outcome_last_frame",
     # QA / filters
     "pbp_rescued",              # yes = recovered from pbp_only via clock-targeted search
     "analysis_eligible",        # yes if row should enter outcome+contest modeling
@@ -200,65 +188,42 @@ def _safe_clock_str(val) -> str:
     return s if s and s not in ("None", "nan") else NA
 
 
-def _outcome_last_tracking_frame_numpy(
-    frames: np.ndarray,
-    periods: np.ndarray,
-    game_clks: np.ndarray,
-    release_idx: int,
-    shot_period: int,
-    conclusion_remaining_sec: float,
-    *,
-    clock_tol_sec: float = 3.0,
-    default_tail_frames: int = OUTCOME_TAIL_FRAMES_NO_METADATA,
-    max_extend: int = OUTCOME_LAST_FRAME_MAX_EXTEND,
-) -> int:
-    """
-    Last Hawk-Eye frame for full-shot viz: through PBP-listed remaining clock, else ~3 s after release.
-
-    ``conclusion_remaining_sec`` is NBA quarter countdown seconds (matches parquet gameClock parsing).
-    """
-    mx_all = int(np.max(frames))
-    rf = int(frames[release_idx])
-    fb_fallback = min(rf + default_tail_frames, mx_all)
-
-    if math.isnan(conclusion_remaining_sec):
-        return min(fb_fallback, rf + max_extend, mx_all)
-
-    best_gate: Optional[int] = None
-    best_nearest_frame = rf
-    best_nearest_err = float("inf")
-
-    for j in range(release_idx, len(frames)):
-        if int(periods[j]) != shot_period:
-            continue
-        gsm = _parquet_clock_to_sec(_safe_clock_str(game_clks[j]))
-        if math.isnan(gsm):
-            continue
-        if gsm <= conclusion_remaining_sec + clock_tol_sec:
-            best_gate = int(frames[j])
-        err = abs(gsm - conclusion_remaining_sec)
-        if err < best_nearest_err:
-            best_nearest_err = err
-            best_nearest_frame = int(frames[j])
-
-    if best_gate is not None:
-        fh = max(rf, min(best_gate, rf + max_extend, mx_all))
-        return fh
-    fh2 = max(rf, min(best_nearest_frame, rf + max_extend, mx_all))
-    if fh2 < fb_fallback:
-        fh2 = min(fb_fallback, rf + max_extend, mx_all)
-    return fh2
-
-
 # ---------------------------------------------------------------------------
 # PBP: fetch + parse
 # ---------------------------------------------------------------------------
 
-def _fetch_pbp(game_id: str) -> List[dict]:
+def _make_pbp_ssl_context(*, insecure: bool) -> Tuple[ssl.SSLContext, str]:
+    """
+    Build an SSL context that verifies the NBA CDN.
+
+    Order:
+      1) truststore — uses the OS trust store (macOS Keychain, Windows, etc.).
+         Fixes common python.org macOS installs where certifi alone still fails.
+      2) certifi — Mozilla CA bundle.
+      3) ssl.create_default_context() — last resort.
+    """
+    if insecure:
+        return ssl._create_unverified_context(), "disabled verification (INSECURE)"
+    try:
+        import truststore
+
+        return truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT), "truststore (OS trust store)"
+    except Exception:
+        pass
+    try:
+        import certifi
+
+        return ssl.create_default_context(cafile=certifi.where()), "certifi CA bundle"
+    except Exception:
+        pass
+    return ssl.create_default_context(), "ssl default context"
+
+
+def _fetch_pbp(game_id: str, *, ssl_context: ssl.SSLContext) -> List[dict]:
     url = PBP_URL.format(game_id=game_id)
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=30, context=ssl_context) as resp:
             return json.loads(resp.read())["game"]["actions"]
     except Exception as exc:
         print(f"  WARNING: PBP fetch failed for {game_id}: {exc}")
@@ -589,29 +554,22 @@ def _build_row_for_release_index(
     release_sec = _parquet_clock_to_sec(release_game_clock)
 
     pbp_idx = -1
-    conclusion_remaining_sec = float("nan")
     if forced_pbp is not None:
         pbp, pbp_idx = forced_pbp
         pbp_result = pbp["shot_result"]
         pbp_clock = _sec_to_mmss(pbp["remaining_sec"])
         pbp_desc = pbp["description"]
-        conclusion_remaining_sec = float(pbp["remaining_sec"])
     else:
         pbp, pbp_idx = _match_pbp(pbp_events, shooter_id, period, release_sec)
         if pbp:
             pbp_result = pbp["shot_result"]
             pbp_clock = _sec_to_mmss(pbp["remaining_sec"])
             pbp_desc = pbp["description"]
-            conclusion_remaining_sec = float(pbp["remaining_sec"])
         else:
             pbp_idx = -1
             pbp_result = NA
             pbp_clock = NA
             pbp_desc = NA
-
-    outcome_last_frame = _outcome_last_tracking_frame_numpy(
-        frames, periods, game_clks, i, period, conclusion_remaining_sec
-    )
 
     row = {
         "game_file": os.path.basename(path),
@@ -646,7 +604,6 @@ def _build_row_for_release_index(
         "pbp_shot_result": pbp_result,
         "pbp_conclusion_game_clock": pbp_clock,
         "pbp_description": pbp_desc,
-        "outcome_last_frame": int(outcome_last_frame),
         "pbp_rescued": pbp_rescued_flag,
         "analysis_eligible": NA,
         "exclusion_reason": NA,
@@ -913,7 +870,6 @@ UNMATCHED_FIELDNAMES = [
     # Tracking fields — populated for tracking_only, NA for pbp_only
     "release_frame", "release_game_clock", "release_shot_clock",
     "contest_distance_ft", "shot_contest_quality",
-    "release_path_residual_in", "alteredness",
     # PBP fields — populated for pbp_only, NA for tracking_only
     "pbp_shot_result", "pbp_conclusion_game_clock", "pbp_description",
 ]
@@ -938,6 +894,11 @@ def main() -> None:
     parser.add_argument(
         "--pbp-delay", type=float, default=0.5,
         help="Seconds to wait between NBA CDN requests (default: 0.5).",
+    )
+    parser.add_argument(
+        "--insecure-pbp-ssl",
+        action="store_true",
+        help="Emergency only: skip TLS verification for NBA CDN (not recommended).",
     )
     parser.add_argument(
         "--no-pbp-rescue", action="store_true",
@@ -995,6 +956,9 @@ def main() -> None:
     heave_dist_in = float(args.heave_min_ft_from_rim) * 12.0
     rescue_enabled = not args.no_pbp_rescue
 
+    pbp_ssl, pbp_ssl_label = _make_pbp_ssl_context(insecure=args.insecure_pbp_ssl)
+    print(f"PBP HTTPS verification: {pbp_ssl_label}")
+
     all_rows:      List[dict] = []
     all_unmatched: List[dict] = []
 
@@ -1011,7 +975,7 @@ def main() -> None:
         print(f"\n{basename}  [game {game_id}]")
 
         print(f"  Fetching PBP ...")
-        pbp_actions = _fetch_pbp(game_id)
+        pbp_actions = _fetch_pbp(game_id, ssl_context=pbp_ssl)
         pbp_events  = _parse_pbp_opponent_3pa(pbp_actions)
         print(f"  PBP: {len(pbp_events)} opponent 3PA events found")
 
@@ -1059,8 +1023,6 @@ def main() -> None:
                 "release_shot_clock":      r["release_shot_clock"],
                 "contest_distance_ft":     r["contest_distance_ft"],
                 "shot_contest_quality":    r["shot_contest_quality"],
-                "release_path_residual_in": r["release_path_residual_in"],
-                "alteredness":              r["alteredness"],
                 "pbp_shot_result":         NA,
                 "pbp_conclusion_game_clock": NA,
                 "pbp_description":         NA,
@@ -1085,8 +1047,6 @@ def main() -> None:
                 "release_shot_clock":      NA,
                 "contest_distance_ft":     NA,
                 "shot_contest_quality":    NA,
-                "release_path_residual_in": NA,
-                "alteredness":              NA,
                 "pbp_shot_result":         e["shot_result"],
                 "pbp_conclusion_game_clock": _sec_to_mmss(e["remaining_sec"]),
                 "pbp_description":         e["description"],

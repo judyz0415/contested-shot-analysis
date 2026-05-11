@@ -1,8 +1,11 @@
+certifi
+truststore
 pandas
 numpy
 pyarrow
 matplotlib
 scipy
+scikit-learn
 plotly
 ipython
 nbformat>=5.10
