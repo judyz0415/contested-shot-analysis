@@ -14,10 +14,12 @@ reuses the animation style from scripts/viz.py.
 from __future__ import annotations
 
 import argparse
+import errno
 import glob
 import math
 import os
 import re
+import time
 from io import BytesIO
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -160,6 +162,100 @@ def full_window_last_frame_from_shot_row(
     cap = min(release_frame + max_extra_frames_after_release, max_parquet_f)
     fh = min(fh, cap)
     return max(min(int(fh), max_parquet_f), release_frame), subtitle
+
+
+def shot_contest_quality_as_float(shot_row: pd.Series) -> float:
+    """Parse ``shot_contest_quality`` from a CSV row; NaN if missing or invalid."""
+    raw = shot_row.get("shot_contest_quality")
+    if _csv_na(raw):
+        return float("nan")
+    try:
+        return float(str(raw).strip())
+    except (TypeError, ValueError):
+        return float("nan")
+
+
+def shot_contest_quality_title_fragment(shot_row: pd.Series) -> str:
+    """Short label for figure titles (CSV ``shot_contest_quality``)."""
+    v = shot_contest_quality_as_float(shot_row)
+    if math.isnan(v):
+        return "SCQ: n/a"
+    return f"SCQ: {v:.2f}"
+
+
+def shot_contest_quality_overlay_text(shot_row: pd.Series) -> str:
+    """Multi-line overlay for matplotlib / Plotly annotations."""
+    v = shot_contest_quality_as_float(shot_row)
+    if math.isnan(v):
+        return "Shot contest quality\n(n/a)"
+    return f"Shot contest quality\n{v:.2f}"
+
+
+def rank_shots_by_contest_quality(shots: pd.DataFrame) -> pd.DataFrame:
+    """
+    Rows with numeric ``shot_contest_quality``, sorted **best → worst**
+    (higher score = stronger contest, first row is best).
+    """
+    if "shot_contest_quality" not in shots.columns:
+        raise ValueError("shots DataFrame must include column 'shot_contest_quality'")
+    scq = shots.apply(shot_contest_quality_as_float, axis=1)
+    mask = scq.notna()
+    if not mask.any():
+        return shots.iloc[0:0].copy()
+    out = shots.loc[mask].copy()
+    out["_scq_sort"] = scq.loc[mask].to_numpy()
+    out = out.sort_values("_scq_sort", ascending=False).drop(columns=["_scq_sort"])
+    return out.reset_index(drop=True)
+
+
+def contest_quality_extreme_pick_list(
+    shots: pd.DataFrame, n: int = 3
+) -> List[Tuple[str, pd.Series]]:
+    """
+    ``n`` highest- then ``n`` lowest-``shot_contest_quality`` shots (same metric as the dataset).
+
+    Returns (label, row) in order: Best #1…#n, then Worst #1…#n. Each ``row`` is safe to pass
+    to ``prepare_shot_viz_assets``.
+    """
+    r = rank_shots_by_contest_quality(shots)
+    if r.empty:
+        return []
+    n_eff = min(max(int(n), 0), len(r))
+    if n_eff == 0:
+        return []
+    best = r.head(n_eff)
+    worst = r.tail(n_eff)
+    picks: List[Tuple[str, pd.Series]] = []
+    for i, (_, row) in enumerate(best.iterrows(), start=1):
+        v = shot_contest_quality_as_float(row)
+        picks.append((f"Best #{i} (SCQ={v:.2f})", row.copy()))
+    for i, (_, row) in enumerate(worst.iterrows(), start=1):
+        v = shot_contest_quality_as_float(row)
+        picks.append((f"Worst #{i} (SCQ={v:.2f})", row.copy()))
+    return picks
+
+
+def _append_scq_corner_annotation_to_plotly_anim(fig, text: Optional[str]) -> None:
+    """
+    Append a static paper annotation to every frame of a Plotly animation figure built by
+    ``viz.create_plotly_anim`` without modifying ``viz.py``.
+    """
+    if not text or not getattr(fig, "frames", None) or len(fig.frames) == 0:
+        return
+    tag = {
+        "text": str(text),
+        "x": 0.05,
+        "y": 0.84,
+        "xref": "paper",
+        "yref": "paper",
+        "showarrow": False,
+        "font": {"size": 14, "color": "#1a5f1a"},
+    }
+    for fr in fig.frames:
+        lay = fr.layout
+        cur = list(lay.annotations) if lay.annotations else []
+        cur.append(tag)
+        lay.update(annotations=cur)
 
 
 def pbp_result_title_fragment(shot_row: pd.Series) -> str:
@@ -459,6 +555,7 @@ def make_release_snapshot_figure(
     *,
     court_png_view: str = "half",
     court_png_half: Optional[str] = None,
+    figure_overlay: Optional[str] = None,
 ):
     links = _available_joint_links(frame_df)
     if not links:
@@ -565,6 +662,18 @@ def make_release_snapshot_figure(
     ax.set_ylabel("Y (in)")
     ax.set_zlabel("Z (in)")
     ax.set_title(title)
+    if figure_overlay:
+        ax.text2D(
+            0.98,
+            0.98,
+            figure_overlay,
+            transform=ax.transAxes,
+            ha="right",
+            va="top",
+            fontsize=10,
+            linespacing=1.15,
+            bbox=dict(boxstyle="round,pad=0.35", facecolor="white", edgecolor="#444", alpha=0.92),
+        )
     ax.view_init(elev=22, azim=112)
     fig.tight_layout()
     return fig
@@ -591,6 +700,54 @@ def display_release_png_inline(fig, dpi: int = 165) -> None:
     display(Image(data=release_figure_to_png_bytes(fig, dpi=dpi)))
 
 
+def _load_parquet_game_df_cached(
+    parquet_path: str,
+    parquet_game_df_cache: Optional[Dict[str, pd.DataFrame]],
+    *,
+    read_retries: int = 5,
+) -> pd.DataFrame:
+    """
+    Read one game's parquet once; optional ``dict`` keyed by resolved path survives across
+    ``prepare_shot_viz_assets`` calls (avoids redundant I/O — helpful on slow cloud drives).
+
+    Retries mitigate transient timeouts (e.g. OneDrive Errno 60).
+    """
+    key = str(Path(parquet_path).resolve())
+    if parquet_game_df_cache is not None and key in parquet_game_df_cache:
+        return parquet_game_df_cache[key]
+
+    last_exc: Optional[Exception] = None
+    n = max(1, int(read_retries))
+    for attempt in range(n):
+        try:
+            df = pd.read_parquet(parquet_path)
+            df = _select_required_columns(df)
+            if parquet_game_df_cache is not None:
+                parquet_game_df_cache[key] = df
+            return df
+        except (TimeoutError, OSError) as exc:
+            last_exc = exc
+            time.sleep(min(45.0, 2.0 * (attempt + 1) ** 2))
+    if last_exc is None:
+        raise RuntimeError("_load_parquet_game_df_cached: failed without capturing an exception")
+    _timed_out = isinstance(last_exc, TimeoutError) or (
+        isinstance(last_exc, OSError) and getattr(last_exc, "errno", None) in (errno.ETIMEDOUT, 60)
+    )
+    if _timed_out:
+        hint = (
+            f"Timed out reading parquet after {n} attempt(s): {parquet_path!r}\n\n"
+            "Errno 60 is ETIMEDOUT: the filesystem did not return bytes in time while PyArrow opened "
+            "or read the file. This is typical for **cloud-synced paths** (OneDrive, iCloud, Dropbox): "
+            "the client may still be downloading, the file may only exist in the cloud, or the link "
+            "stalled briefly.\n\n"
+            "**Fix:** put `*.parquet` in a **plain local folder** (fully on disk), set `PARQUET_DIR` to "
+            "that path, or make the OneDrive folder **Available offline** / wait until sync finishes. "
+            "The in-memory cache helps only *after* a game file has loaded once."
+        )
+        raise TimeoutError(hint) from last_exc
+    raise last_exc
+
+
 def prepare_shot_viz_assets(
     shot_row: pd.Series,
     parquet_dir: str,
@@ -599,10 +756,14 @@ def prepare_shot_viz_assets(
     *,
     court_png_view: str = "half",
     court_png_half: Optional[str] = None,
+    parquet_game_df_cache: Optional[Dict[str, pd.DataFrame]] = None,
 ) -> Dict[str, Any]:
     """
     Build all visualization objects for one shot row (matplotlib + Plotly).
     Intended for Jupyter notebooks as well as process_one_shot disk export.
+
+    ``parquet_game_df_cache``: optional shared dict mapping resolved parquet paths to filtered
+    dataframes loaded by `_select_required_columns` (reuse across notebook cells / shots).
     """
     game_file = str(shot_row["game_file"]).strip()
     game_id = (
@@ -615,8 +776,7 @@ def prepare_shot_viz_assets(
     shooter_name = str(shot_row.get("shooter_name", shooter_id))
 
     parquet_path = _resolve_parquet_path(parquet_dir, game_file, shot_row.get("game_id"))
-    game_df = pd.read_parquet(parquet_path)
-    game_df = _select_required_columns(game_df)
+    game_df = _load_parquet_game_df_cached(parquet_path, parquet_game_df_cache)
 
     release_df = game_df[game_df["frame"] == release_frame].copy()
     if release_df.empty:
@@ -648,9 +808,12 @@ def prepare_shot_viz_assets(
     full_window = full_window[full_window["player_id"].isin([shooter_id, defender_id])].copy()
     full_window = _normalize_joint_columns_for_viz(full_window)
 
+    scq_title = shot_contest_quality_title_fragment(shot_row)
+    scq_overlay = shot_contest_quality_overlay_text(shot_row)
+
     mpl_title = (
         f"Release snapshot | game {game_id} | frame {release_frame} | "
-        f"{shooter_name} vs defender {defender_id}"
+        f"{shooter_name} vs defender {defender_id} | {scq_title}"
     )
     fig_mpl = make_release_snapshot_figure(
         release_df,
@@ -659,22 +822,29 @@ def prepare_shot_viz_assets(
         mpl_title,
         court_png_view=court_png_view,
         court_png_half=court_png_half,
+        figure_overlay=scq_overlay,
     )
 
-    release_title = f"Release only | game {game_id} | frame {release_frame} | shooter {shooter_name}"
+    release_title = (
+        f"Release only | game {game_id} | frame {release_frame} | shooter {shooter_name} | {scq_title}"
+    )
     fig_plotly_release = create_plotly_anim(release_only, ball_column="ball", title=release_title)
+    _append_scq_corner_annotation_to_plotly_anim(fig_plotly_release, scq_overlay)
 
     pre_anim_title = (
-        f"Pre-release ({pre_frames} frames → release) | game {game_id} | {shooter_name}"
+        f"Pre-release ({pre_frames} frames → release) | game {game_id} | {shooter_name} | {scq_title}"
     )
     fig_plotly_pre = create_plotly_anim(pre_release_window, ball_column="ball", title=pre_anim_title)
+    _append_scq_corner_annotation_to_plotly_anim(fig_plotly_pre, scq_overlay)
 
     outcome_frag = pbp_result_title_fragment(shot_row)
     full_title = (
-        f"Shot window | {outcome_frag} | ({pre_frames} pre → release frame {release_frame}, {full_window_suffix}) | "
+        f"Shot window | {outcome_frag} | {scq_title} | "
+        f"({pre_frames} pre → release frame {release_frame}, {full_window_suffix}) | "
         f"game {game_id} | {shooter_name}"
     )
     fig_plotly_full = create_plotly_anim(full_window, ball_column="ball", title=full_title)
+    _append_scq_corner_annotation_to_plotly_anim(fig_plotly_full, scq_overlay)
 
     return {
         "game_id": game_id,
@@ -729,6 +899,7 @@ def process_one_shot(
     *,
     court_png_view: str = "half",
     court_png_half: Optional[str] = None,
+    parquet_game_df_cache: Optional[Dict[str, pd.DataFrame]] = None,
 ) -> Dict[str, str]:
     assets = prepare_shot_viz_assets(
         shot_row,
@@ -737,6 +908,7 @@ def process_one_shot(
         post_frames,
         court_png_view=court_png_view,
         court_png_half=court_png_half,
+        parquet_game_df_cache=parquet_game_df_cache,
     )
     game_id = assets["game_id"]
     release_frame = assets["release_frame"]
