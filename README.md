@@ -56,7 +56,7 @@ The merge script pulls play-by-play from the NBA CDN (`cdn.nba.com`) using each 
 
 **Rescue pass.** Events that appear in PBP but miss on the first pass are searched again: frames where clock and `last_touch` match the PBP shooter and release falls on the remaining clock slightly before the logged resolution time (configurable lag). Thresholds for ball height and rim proximity are relaxed to recover flat or missed-track releases.
 
-**Filtering.** `analysis_eligible` summarizes rows suitable for modeling; `exclusion_reason` lists structured codes (missing PBP match, long-distance heave, low shot clock at release, “heave” in description). `suspected_low_arc_or_lob` flags unusually low apex height for manual review only.
+**Filtering.** `analysis_eligible` summarizes rows suitable for broad outcome modeling (PBP, heave, shot-clock gates). `defender_model_eligible` (set at build time) further requires every numeric input used by the defender lift logit—including named nearest defender, parseable make/miss, finite `closeout_delta_ft_500ms`, and a filled `shooter_2025_26_regular_3pt_pct`—so lift and SCQ scripts can share one pool via `--defender-model-eligible-only`. `exclusion_reason` lists structured codes when `analysis_eligible=no`. `suspected_low_arc_or_lob` flags unusually low apex height for manual review only.
 
 ## Outputs
 
@@ -80,6 +80,7 @@ Companion filenames derive from `--output-csv` unless overridden (`--excluded-he
 | `--heave-min-ft-from-rim` | Exclude attempts beyond this arc distance from the attacking rim |
 | `--min-shot-clock-analysis`, `--desperate-shot-clock` | Shot-clock thresholds at release |
 | `--excluded-heaves-csv` | Custom path for heave audit extraction |
+| `--player-statistics-csv` | Shrunk shooter 3P% priors for `shooter_2025_26_regular_3pt_pct` (default `data/PlayerStatistics.csv`; league fallback if missing) |
 | `--insecure-pbp-ssl` | Emergency only: disable TLS verification for PBP (avoid if possible) |
 
 ## Visualization Workflow
@@ -103,7 +104,7 @@ Outputs are written to `data/outputs/visualizations/shot_sequences/runs/<shot_id
 
 ## Schema (high level)
 
-Identifiers and clocks (`release_*`, `apex_*`), ball position at release, rim alignment (`rim_x`, `rim_y`), `min_ball_rim_3d_in`, nearest defender identity and distance, closeout speed and angle, `hand_up_in`, `shot_contest_quality`, then PBP outcome columns plus `pbp_rescued`, `analysis_eligible`, `exclusion_reason`, `suspected_low_arc_or_lob`.
+Identifiers and clocks (`release_*`, `apex_*`), ball position at release, rim alignment (`rim_x`, `rim_y`), `min_ball_rim_3d_in`, nearest defender identity and distance, closeout speed and angle, `hand_up_in`, `shot_contest_quality`, then PBP outcome columns plus `pbp_rescued`, `analysis_eligible`, `exclusion_reason`, `suspected_low_arc_or_lob`, `shooter_2025_26_regular_3pt_pct`, `defender_model_eligible`, and `defender_model_exclusion_reason`.
 
 Release clock reflects ball leaving the hands; PBP conclusion clock reflects when the feed logs resolution (typically a short interval earlier on the game countdown).
 

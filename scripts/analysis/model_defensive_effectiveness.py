@@ -285,8 +285,17 @@ def main() -> None:
     )
     parser.add_argument(
         "--analysis-eligible-only",
+        dest="analysis_eligible_only",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Keep rows where analysis_eligible=yes (default: on; same pool as SCQ when it uses this filter). "
+        "Pass --no-analysis-eligible-only to include all CSV rows that pass model completeness checks.",
+    )
+    parser.add_argument(
+        "--defender-model-eligible-only",
         action="store_true",
-        help="Keep rows where analysis_eligible=yes (requires column on shot CSV).",
+        help="Keep rows where defender_model_eligible=yes (from build_unified_shot_dataset; "
+        "aligns lift with SCQ driver tables). Overrides --analysis-eligible-only when both are set.",
     )
     parser.add_argument(
         "--player-statistics-csv",
@@ -338,13 +347,29 @@ def main() -> None:
         if missing:
             raise ValueError(f"Missing required columns in input CSV: {missing}")
 
+        if args.defender_model_eligible_only:
+            if reader.fieldnames is None or "defender_model_eligible" not in reader.fieldnames:
+                raise ValueError(
+                    "--defender-model-eligible-only requires column defender_model_eligible; "
+                    "re-run scripts/pipeline/build_unified_shot_dataset.py to refresh the shot CSV."
+                )
+        elif args.analysis_eligible_only:
+            if reader.fieldnames is None or "analysis_eligible" not in reader.fieldnames:
+                raise ValueError(
+                    "analysis_eligible column is missing from the shot CSV. "
+                    "Re-run scripts/pipeline/build_unified_shot_dataset.py, or pass --no-analysis-eligible-only."
+                )
+
         priors: Optional[Dict[int, float]] = None
         league_pct = 0.36
         if merge_shooter:
             priors, league_pct = _load_shrink_shooter_3pt_priors(args.player_statistics_csv)
 
         for row in reader:
-            if args.analysis_eligible_only:
+            if args.defender_model_eligible_only:
+                if (row.get("defender_model_eligible") or "").strip().lower() != "yes":
+                    continue
+            elif args.analysis_eligible_only:
                 if (row.get("analysis_eligible") or "").strip().lower() != "yes":
                     continue
             if merge_shooter and priors is not None:
