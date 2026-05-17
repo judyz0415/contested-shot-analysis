@@ -89,8 +89,17 @@ def main() -> None:
     parser.add_argument("--min-shots", type=int, default=5, help="Minimum defender shots for report.")
     parser.add_argument(
         "--analysis-eligible-only",
+        dest="analysis_eligible_only",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Restrict to analysis_eligible=yes (default: on). Pass --no-analysis-eligible-only for all rows "
+        "with finite SCQ inputs.",
+    )
+    parser.add_argument(
+        "--defender-model-eligible-only",
         action="store_true",
-        help="Restrict to rows with analysis_eligible=yes (requires column on CSV).",
+        help="Restrict to defender_model_eligible=yes (same pool as model_defensive_effectiveness "
+        "with this flag). Overrides --analysis-eligible-only when both are set.",
     )
     parser.add_argument(
         "--final-csv",
@@ -126,8 +135,24 @@ def main() -> None:
         if missing:
             raise ValueError(f"Missing required columns: {missing}")
 
+        if args.defender_model_eligible_only:
+            if reader.fieldnames is None or "defender_model_eligible" not in reader.fieldnames:
+                raise ValueError(
+                    "--defender-model-eligible-only requires column defender_model_eligible; "
+                    "re-run scripts/pipeline/build_unified_shot_dataset.py to refresh the shot CSV."
+                )
+        elif args.analysis_eligible_only:
+            if reader.fieldnames is None or "analysis_eligible" not in reader.fieldnames:
+                raise ValueError(
+                    "analysis_eligible column is missing from the shot CSV. "
+                    "Re-run scripts/pipeline/build_unified_shot_dataset.py, or pass --no-analysis-eligible-only."
+                )
+
         for row in reader:
-            if args.analysis_eligible_only:
+            if args.defender_model_eligible_only:
+                if (row.get("defender_model_eligible") or "").strip().lower() != "yes":
+                    continue
+            elif args.analysis_eligible_only:
                 ae = (row.get("analysis_eligible") or "").strip().lower()
                 if ae != "yes":
                     continue

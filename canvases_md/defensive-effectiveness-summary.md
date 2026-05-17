@@ -81,6 +81,8 @@ python scripts/analysis/explain_scq_drivers_by_defender.py \
   --csv data/intermediate/shot_contest_dataset.csv \
   --out-dir data/outputs \
   --min-shots 5 \
-  --analysis-eligible-only \
+  --defender-model-eligible-only \
   --final-csv data/outputs/heat_defender_scq_breakdown_final.csv
 ```
+
+(Requires a shot CSV rebuilt with `build_unified_shot_dataset.py` so `defender_model_eligible` is present. Use `--analysis-eligible-only` instead only if you intentionally want the wider eligible pool.)

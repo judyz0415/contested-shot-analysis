@@ -124,6 +124,14 @@ Notes:
 - All **51** rows without PBP outcome are ineligible (**`no_pbp_match`** appears on each; three also tag **`heave_long_distance`**).
 - **One** row **did** match PBP (**Made**) but was excluded for **sub-1s shot clock** / desperation — so **510 − 1 = 509** eligible with outcomes.
 
+### Defender model eligibility (`defender_model_eligible`)
+
+After all games are merged, the builder assigns **`shooter_2025_26_regular_3pt_pct`** from **`--player-statistics-csv`** (default `data/PlayerStatistics.csv`) using the same shrinkage logic as `model_defensive_effectiveness.py`. If that file is missing, an empty prior table with **league_pct = 0.36** is used (every known `shooter_id` still gets a finite prior).
+
+**`defender_model_eligible=yes`** only when **`analysis_eligible=yes`** and **all** lift-model inputs are usable: non-empty nearest defender and shooter ids, PBP result contains `made` or `miss`, finite **`shooter_2025_26_regular_3pt_pct`**, **`shooter_dist_to_rim_in`**, **`release_ball_z`**, **`apex_ball_z`**, parseable finite **`release_shot_clock`**, and finite contest numerics including **`closeout_delta_ft_500ms`** and **`shot_contest_quality`**. Otherwise **`defender_model_eligible=no`** with a **`defender_model_exclusion_reason`** code (e.g. `analysis_ineligible`, `nonfinite_closeout_delta_ft_500ms`).
+
+Downstream, pass **`--defender-model-eligible-only`** to **`model_defensive_effectiveness.py`** and **`explain_scq_drivers_by_defender.py`** so defender lift and SCQ driver tables use the **same** shot rows. Re-run the builder after changing tracking or PBP logic so these columns stay in sync.
+
 ### Excluded-heaves audit file
 
 **`shot_contest_dataset_excluded_heaves.csv`** (4 rows) lists main-file rows where **`exclusion_reason`** intersects **`heave_long_distance`**, **`shot_clock_below_1s`**, **`desperate_shot_clock_le_0p8`**, or **`pbp_keyword_heave`**. Rows that are ineligible **only** due to **`no_pbp_match`** are **not** copied there.
@@ -174,6 +182,6 @@ The console summary prints per-game tracking vs matched vs eligible totals and t
 
 ---
 
-## 10. Downstream “cleaning” (outside this script)
+## 10. Downstream analysis (aligned row pool)
 
-Scripts such as **`scripts/analysis/model_defensive_effectiveness.py`** may **read** the CSV and drop rows with missing numeric fields or outcomes inside the analysis script; that is **separate** from the pipeline above and depends on which columns those models require (e.g. merged shooter priors if present).
+The builder now tags **`defender_model_eligible`** using the same finite-field and outcome rules as **`model_defensive_effectiveness.py`**. Pass **`--defender-model-eligible-only`** there and in **`explain_scq_drivers_by_defender.py`** so defender lift and SCQ breakdowns share one shot pool without silent drops inside each script. Older CSVs without this column still rely on per-script filtering.

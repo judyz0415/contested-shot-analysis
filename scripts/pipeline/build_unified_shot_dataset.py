@@ -9,7 +9,7 @@ One row per opponent 3-point attempt. Columns:
 
   Release  (Hawk-Eye: moment ball leaves shooter's hand)
     release_frame, release_game_clock, release_shot_clock
-    shooter_id, shooter_name, shooter_team
+    shooter_id, shooter_name, shooter_team, shooter_2025_26_regular_3pt_pct
     shooter_dist_to_rim_in, rim_x, rim_y
     release_ball_x, release_ball_y, release_ball_z
 
@@ -31,6 +31,9 @@ One row per opponent 3-point attempt. Columns:
     analysis_eligible — no if missing PBP, long-range heave, or low shot clock
     exclusion_reason — machine-readable codes (see HEAVE_AUDIT_REASONS subset)
     suspected_low_arc_or_lob — low apex_height heuristic (possible lob mis-tag)
+    shooter_2025_26_regular_3pt_pct — shrunk regular-season 3P% (Beta-style; from --player-statistics-csv)
+    defender_model_eligible — yes iff row matches lift-model input checks (named defender, finite features)
+    defender_model_exclusion_reason — codes when defender_model_eligible=no
 
 Extras:
     <output>_excluded_heaves.csv lists rows flagged by heave / desperation rules.
@@ -110,6 +113,7 @@ FIELDNAMES = [
     # Release
     "release_frame", "release_game_clock", "release_shot_clock",
     "shooter_id", "shooter_name", "shooter_team",
+    "shooter_2025_26_regular_3pt_pct",
     "shooter_dist_to_rim_in", "rim_x", "rim_y",
     "release_ball_x", "release_ball_y", "release_ball_z",
     # Arc apex
@@ -126,6 +130,8 @@ FIELDNAMES = [
     "analysis_eligible",        # yes if row should enter outcome+contest modeling
     "exclusion_reason",         # semicolon-separated codes when not eligible
     "suspected_low_arc_or_lob", # yes if apex height is unusually low for a jumper
+    "defender_model_eligible",  # yes = same inclusion rules as scripts/analysis/model_defensive_effectiveness.py
+    "defender_model_exclusion_reason",
 ]
 
 
@@ -436,6 +442,130 @@ def _finalize_row_analysis_columns(
         pass
 
 
+def _row_float_guard(val) -> float:
+    """Parse a CSV/row cell to float; NA / blank -> nan (aligned with analysis scripts)."""
+    if val is None:
+        return float("nan")
+    s = str(val).strip()
+    if not s or s.upper() == "NA":
+        return float("nan")
+    try:
+        return float(s)
+    except ValueError:
+        return float("nan")
+
+
+def _load_shrink_shooter_3pt_priors(
+    path: str, *, pseudo_attempts: float = 50.0
+) -> Tuple[Dict[int, float], float]:
+    """
+    Shrunk regular-season 3P% by personId (same logic as model_defensive_effectiveness).
+    Returns (person_id -> pct, league_pct).
+    """
+    tpm: Dict[int, float] = {}
+    tpa: Dict[int, float] = {}
+    with open(path, "r", newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for prow in reader:
+            if (prow.get("gameType") or "").strip() != "Regular Season":
+                continue
+            gd = (prow.get("gameDate") or "").strip()
+            if len(gd) >= 10 and gd[:10] < "2025-10-01":
+                continue
+            pid_raw = (prow.get("personId") or "").strip()
+            if not pid_raw:
+                continue
+            pid = int(pid_raw)
+            ta = _row_float_guard(prow.get("threePointersAttempted"))
+            tm = _row_float_guard(prow.get("threePointersMade"))
+            if not math.isfinite(ta) or not math.isfinite(tm):
+                continue
+            tpa[pid] = tpa.get(pid, 0.0) + ta
+            tpm[pid] = tpm.get(pid, 0.0) + tm
+
+    league_tpa = sum(tpa.values())
+    league_tpm = sum(tpm.values())
+    league_pct = league_tpm / league_tpa if league_tpa > 1e-9 else 0.36
+
+    priors: Dict[int, float] = {}
+    k = pseudo_attempts
+    for pid, att in tpa.items():
+        made = tpm.get(pid, 0.0)
+        priors[pid] = (made + k * league_pct) / (att + k)
+    return priors, league_pct
+
+
+def _assign_shooter_prior_column(row: dict, priors: Dict[int, float], league_pct: float) -> None:
+    """Set shooter_2025_26_regular_3pt_pct from priors (league fallback when unknown)."""
+    sid = (row.get("shooter_id") or "").strip()
+    if not sid:
+        row["shooter_2025_26_regular_3pt_pct"] = NA
+        return
+    try:
+        pid = int(sid)
+    except ValueError:
+        row["shooter_2025_26_regular_3pt_pct"] = NA
+        return
+    pct = priors.get(pid, league_pct)
+    row["shooter_2025_26_regular_3pt_pct"] = f"{pct:.8f}"
+
+
+def _finalize_defender_model_columns(row: dict) -> None:
+    """
+    Match row-inclusion rules in scripts/analysis/model_defensive_effectiveness.py:
+    analysis_eligible, named nearest defender, parseable PBP make/miss, finite baseline
+    + contest numerics (including closeout_delta_ft_500ms), finite release shot clock,
+    finite shrunk shooter 3P%.
+    """
+    reasons: List[str] = []
+
+    if row.get("analysis_eligible") != "yes":
+        reasons.append("analysis_ineligible")
+
+    did = (row.get("nearest_defender_id") or "").strip()
+    dnm = (row.get("nearest_defender_name") or "").strip()
+    if not did or not dnm:
+        reasons.append("missing_nearest_defender")
+
+    if not (row.get("shooter_id") or "").strip():
+        reasons.append("missing_shooter_id")
+
+    pbp_raw = (row.get("pbp_shot_result") or "").strip().lower()
+    if row.get("pbp_shot_result") == NA or not pbp_raw:
+        reasons.append("invalid_pbp_outcome")
+    elif "made" not in pbp_raw and "miss" not in pbp_raw:
+        reasons.append("invalid_pbp_outcome")
+
+    baseline_cols = (
+        "shooter_dist_to_rim_in",
+        "release_ball_z",
+        "apex_ball_z",
+        "shooter_2025_26_regular_3pt_pct",
+    )
+    for c in baseline_cols:
+        if not math.isfinite(_row_float_guard(row.get(c))):
+            reasons.append(f"nonfinite_{c}")
+
+    sc = _parse_shot_clock_seconds(row.get("release_shot_clock"))
+    if not math.isfinite(sc):
+        reasons.append("nonfinite_release_shot_clock")
+
+    contest_cols = (
+        "contest_distance_ft",
+        "closeout_speed_ft_s",
+        "closeout_delta_ft_500ms",
+        "contest_angle_deg",
+        "hand_up_in",
+        "shot_contest_quality",
+    )
+    for c in contest_cols:
+        if not math.isfinite(_row_float_guard(row.get(c))):
+            reasons.append(f"nonfinite_{c}")
+
+    row["defender_model_eligible"] = "no" if reasons else "yes"
+    row["defender_model_exclusion_reason"] = ";".join(dict.fromkeys(reasons)) if reasons else ""
+
+
 def _build_row_for_release_index(
     i: int,
     path: str,
@@ -582,6 +712,7 @@ def _build_row_for_release_index(
         "shooter_id": shooter_id,
         "shooter_name": shooter_name,
         "shooter_team": shooter_team_name,
+        "shooter_2025_26_regular_3pt_pct": NA,
         "shooter_dist_to_rim_in": round(shooter_dist_in, 2),
         "rim_x": rim_x,
         "rim_y": rim_y,
@@ -608,6 +739,8 @@ def _build_row_for_release_index(
         "analysis_eligible": NA,
         "exclusion_reason": NA,
         "suspected_low_arc_or_lob": NA,
+        "defender_model_eligible": NA,
+        "defender_model_exclusion_reason": NA,
     }
     return row, pbp_idx
 
@@ -933,6 +1066,12 @@ def main() -> None:
         help="Optional path for heave / desperation exclusions audit file "
         "(default: <output-csv basename>_excluded_heaves.csv).",
     )
+    parser.add_argument(
+        "--player-statistics-csv",
+        default="data/PlayerStatistics.csv",
+        help="NBA PlayerStatistics-style CSV for shrunk shooter 3P%% priors "
+        "(same as model_defensive_effectiveness). If missing, league fallback is used.",
+    )
     args = parser.parse_args()
 
     if not os.path.isdir(args.input_dir):
@@ -1054,6 +1193,21 @@ def main() -> None:
 
         time.sleep(args.pbp_delay)
 
+    stats_path = os.path.abspath(args.player_statistics_csv)
+    if os.path.isfile(stats_path):
+        shooter_priors, league_3p = _load_shrink_shooter_3pt_priors(stats_path)
+        print(f"\nShooter priors loaded: {stats_path} ({len(shooter_priors)} players, league={league_3p:.4f})")
+    else:
+        shooter_priors, league_3p = {}, 0.36
+        print(
+            f"\nWARNING: Player statistics not found:\n  {stats_path}\n"
+            f"Using empty priors with league_pct={league_3p} for shooter_2025_26_regular_3pt_pct."
+        )
+
+    for r in all_rows:
+        _assign_shooter_prior_column(r, shooter_priors, league_3p)
+        _finalize_defender_model_columns(r)
+
     # ── Write main dataset ────────────────────────────────────────────────────
     with open(args.output_csv, "w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=FIELDNAMES)
@@ -1076,9 +1230,11 @@ def main() -> None:
     tracking_only   = sum(1 for r in all_unmatched if r["unmatched_type"] == "tracking_only")
     pbp_only        = sum(1 for r in all_unmatched if r["unmatched_type"] == "pbp_only")
     eligible_all    = sum(1 for r in all_rows if r.get("analysis_eligible") == "yes")
+    dm_eligible_all = sum(1 for r in all_rows if r.get("defender_model_eligible") == "yes")
 
     print(f"\nMain dataset : {len(all_rows)} rows ({total_matched} matched) -> {args.output_csv}")
     print(f"Eligible     : {eligible_all} rows (analysis_eligible=yes)")
+    print(f"Defender model eligible: {dm_eligible_all} rows (defender_model_eligible=yes)")
     print(f"Excluded heaves audit: {len(heave_rows)} rows -> {heaves_csv}")
     print(f"Unmatched    : {len(all_unmatched)} rows "
           f"({tracking_only} tracking_only, {pbp_only} pbp_only) -> {unmatched_csv}")
