@@ -307,13 +307,15 @@ def main() -> None:
         "apex_ball_z",
         "release_shot_clock",
     ]
+    # closeout_delta_ft_500ms excluded: it equals closeout_speed_ft_s * 0.5 (perfect collinearity).
+    # shot_contest_quality excluded: it is a weighted sum of the four component features below,
+    # creating near-perfect collinearity that prevents the model from separately identifying
+    # component contributions.
     contest_numeric_cols = [
         "contest_distance_ft",
         "closeout_speed_ft_s",
-        "closeout_delta_ft_500ms",
         "contest_angle_deg",
         "hand_up_in",
-        "shot_contest_quality",
     ]
 
     shots: List[Dict[str, str]] = []

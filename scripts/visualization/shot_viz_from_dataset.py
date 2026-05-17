@@ -191,33 +191,53 @@ def shot_contest_quality_overlay_text(shot_row: pd.Series) -> str:
     return f"Shot contest quality\n{v:.2f}"
 
 
-def rank_shots_by_contest_quality(shots: pd.DataFrame) -> pd.DataFrame:
+def rank_shots_by_contest_quality(
+    shots: pd.DataFrame, *, eligible_only: bool = False
+) -> pd.DataFrame:
     """
     Rows with numeric ``shot_contest_quality``, sorted **best → worst**
     (higher score = stronger contest, first row is best).
+
+    If ``eligible_only`` is True and the table has ``analysis_eligible``, keep only rows
+    marked ``yes`` (rebuilt pipeline CSV). Rows with no usable ``pbp_shot_result`` are also
+    dropped (defense in depth for older CSVs or post-whistle motion without PBP).
     """
     if "shot_contest_quality" not in shots.columns:
         raise ValueError("shots DataFrame must include column 'shot_contest_quality'")
-    scq = shots.apply(shot_contest_quality_as_float, axis=1)
+    base = shots
+    if eligible_only and "analysis_eligible" in base.columns:
+        elig = base["analysis_eligible"].astype(str).str.strip().str.lower() == "yes"
+        base = base.loc[elig].copy()
+    if eligible_only and "pbp_shot_result" in base.columns:
+        pr = base["pbp_shot_result"]
+        st = pr.astype(str).str.strip()
+        has_pbp = pr.notna() & st.str.len().gt(0) & ~st.str.upper().isin(
+            ("NA", "NAN", "NONE", "<NA>")
+        )
+        base = base.loc[has_pbp].copy()
+    scq = base.apply(shot_contest_quality_as_float, axis=1)
     mask = scq.notna()
     if not mask.any():
-        return shots.iloc[0:0].copy()
-    out = shots.loc[mask].copy()
+        return base.iloc[0:0].copy()
+    out = base.loc[mask].copy()
     out["_scq_sort"] = scq.loc[mask].to_numpy()
     out = out.sort_values("_scq_sort", ascending=False).drop(columns=["_scq_sort"])
     return out.reset_index(drop=True)
 
 
 def contest_quality_extreme_pick_list(
-    shots: pd.DataFrame, n: int = 3
+    shots: pd.DataFrame, n: int = 3, *, eligible_only: bool = True
 ) -> List[Tuple[str, pd.Series]]:
     """
     ``n`` highest- then ``n`` lowest-``shot_contest_quality`` shots (same metric as the dataset).
 
+    By default only ``analysis_eligible == yes`` rows participate, and rows without a real
+    ``pbp_shot_result`` are dropped (e.g. post-whistle releases with no PBP event).
+
     Returns (label, row) in order: Best #1…#n, then Worst #1…#n. Each ``row`` is safe to pass
     to ``prepare_shot_viz_assets``.
     """
-    r = rank_shots_by_contest_quality(shots)
+    r = rank_shots_by_contest_quality(shots, eligible_only=eligible_only)
     if r.empty:
         return []
     n_eff = min(max(int(n), 0), len(r))

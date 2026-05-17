@@ -17,7 +17,7 @@ One row per opponent 3-point attempt. Columns:
     apex_frame, apex_game_clock, apex_shot_clock, apex_ball_z
 
   Contest features  (Hawk-Eye: computed at release frame)
-    min_ball_rim_3d_in
+    min_ball_rim_3d_in, min_ball_rim_3d_through_play_in
     nearest_defender_id, nearest_defender_name
     contest_distance_ft, closeout_speed_ft_s, closeout_delta_ft_500ms
     contest_angle_deg, hand_up_in, shot_contest_quality
@@ -28,12 +28,13 @@ One row per opponent 3-point attempt. Columns:
 
   QA filters  (automatic tags — tune via CLI constants)
     pbp_rescued — secondary pass anchored on PBP resolution clock + shooter
-    analysis_eligible — no if missing PBP, long-range heave, or low shot clock
+    analysis_eligible — no if no PBP match, long-range heave, low shot clock, deep release (~half court),
+    or ball never approaches the attacking rim within the play window (pass-like)
     exclusion_reason — machine-readable codes (see HEAVE_AUDIT_REASONS subset)
     suspected_low_arc_or_lob — low apex_height heuristic (possible lob mis-tag)
 
 Extras:
-    <output>_excluded_heaves.csv lists rows flagged by heave / desperation rules.
+    <output>_excluded_heaves.csv lists rows flagged by heave / desperation / analytics-geometry rules.
 
 Usage:
     python build_unified_shot_dataset.py \\
@@ -95,9 +96,35 @@ DESPERATE_SHOT_CLOCK_SEC = 0.8                     # always exclude at or below 
 # Heuristic flag when apex never reaches typical jumper height — possible lob / mis-tagged pass.
 LOW_ARC_APEX_Z_INCHES = 158.0
 
+# Analytics eligibility (master CSV keeps all rows; these set analysis_eligible=no + exclusion_reason).
+# Shooter farther than this from the *attacking* rim (inches) → deep / half-court release, not for contest analytics.
+ANALYTICS_MAX_SHOOTER_DIST_TO_RIM_IN = 40.0 * 12.0
+# Ball must get at least this close (3D, inches) to the attacking rim at some point from release through the window below.
+ANALYTICS_BALL_MUST_APPROACH_RIM_LE_IN = 54.0
+# Post-release frames to scan for closest ball–rim approach (passes may miss the rim in the early apex window).
+ANALYTICS_PLAY_WINDOW_FRAMES = 360
+
 MIAMI_TEAM_ID = 1610612748
 PBP_URL = "https://cdn.nba.com/static/json/liveData/playbyplay/playbyplay_{game_id}.json"
 NA = "NA"
+
+
+def _pbp_shot_result_missing(val) -> bool:
+    """True when there is no usable PBP shot outcome (CSV may use NA, blank, or float NaN)."""
+    if val is None:
+        return True
+    if isinstance(val, (float, np.floating)):
+        try:
+            if math.isnan(float(val)):
+                return True
+        except (TypeError, ValueError):
+            pass
+    s = str(val).strip()
+    if not s:
+        return True
+    if s.upper() == "NA" or s.upper() == "<NA>" or s.lower() in ("nan", "none", "<na>"):
+        return True
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -116,6 +143,7 @@ FIELDNAMES = [
     "apex_frame", "apex_game_clock", "apex_shot_clock", "apex_ball_z",
     # Contest features
     "min_ball_rim_3d_in",
+    "min_ball_rim_3d_through_play_in",
     "nearest_defender_id", "nearest_defender_name",
     "contest_distance_ft", "closeout_speed_ft_s", "closeout_delta_ft_500ms",
     "contest_angle_deg", "hand_up_in", "shot_contest_quality",
@@ -186,6 +214,27 @@ def _safe_clock_str(val) -> str:
         return NA
     s = str(val).strip()
     return s if s and s not in ("None", "nan") else NA
+
+
+def _min_ball_rim_3d_over_index_range(
+    ball_x: np.ndarray,
+    ball_y: np.ndarray,
+    ball_z: np.ndarray,
+    lo: int,
+    hi: int,
+    rim_x: float,
+    rim_y: float,
+    rim_z: float,
+) -> float:
+    """Minimum 3-D distance (inches) from ball to a single rim over frame indices [lo, hi]."""
+    lo = max(0, int(lo))
+    hi = min(int(hi), len(ball_x) - 1)
+    if hi < lo:
+        return float("nan")
+    dx = ball_x[lo : hi + 1] - rim_x
+    dy = ball_y[lo : hi + 1] - rim_y
+    dz = ball_z[lo : hi + 1] - rim_z
+    return float(np.nanmin(np.sqrt(dx * dx + dy * dy + dz * dz)))
 
 
 # ---------------------------------------------------------------------------
@@ -396,13 +445,15 @@ def _finalize_row_analysis_columns(
     heave_min_dist_from_rim_in: float,
     min_shot_clock: float,
     desperate_shot_clock: float,
+    analytics_max_shooter_dist_to_rim_in: float,
+    analytics_ball_must_approach_rim_le_in: float,
 ) -> None:
     """Populate pbp_rescued / analysis eligibility / heuristic lob flag."""
     if row.get("pbp_rescued") != "yes":
         row["pbp_rescued"] = "no"
 
     reasons: List[str] = []
-    if row.get("pbp_shot_result") == NA:
+    if _pbp_shot_result_missing(row.get("pbp_shot_result")):
         reasons.append("no_pbp_match")
 
     sc = _parse_shot_clock_seconds(row.get("release_shot_clock"))
@@ -417,12 +468,21 @@ def _finalize_row_analysis_columns(
         dist_in = float(row["shooter_dist_to_rim_in"])
         if dist_in >= heave_min_dist_from_rim_in - 1e-9:
             reasons.append("heave_long_distance")
+        if dist_in >= analytics_max_shooter_dist_to_rim_in - 1e-9:
+            reasons.append("shooter_beyond_analytics_arc")
     except (TypeError, ValueError, KeyError):
         pass
 
     desc = (row.get("pbp_description") or "").lower()
     if "heave" in desc:
         reasons.append("pbp_keyword_heave")
+
+    try:
+        play_min = float(row["min_ball_rim_3d_through_play_in"])
+        if not math.isnan(play_min) and play_min > analytics_ball_must_approach_rim_le_in + 1e-9:
+            reasons.append("ball_far_from_rim_play_window")
+    except (TypeError, ValueError, KeyError):
+        pass
 
     row["analysis_eligible"] = "no" if reasons else "yes"
     row["exclusion_reason"] = ";".join(reasons) if reasons else ""
@@ -457,6 +517,7 @@ def _build_row_for_release_index(
     rim_approach_max_in: float = 18.0,
     allowed_z_thresholds: Tuple[float, ...] = (RELEASE_Z_THRESHOLD,),
     pbp_rescued_flag: str = "no",
+    analytics_play_window_frames: int = ANALYTICS_PLAY_WINDOW_FRAMES,
 ) -> Tuple[Optional[dict], int]:
     """
     Build one output row for a candidate release frame index i.
@@ -502,6 +563,11 @@ def _build_row_for_release_index(
     apex_game_clock = _safe_clock_str(game_clks[apex_i])
     apex_shot_clock = _safe_clock_str(shot_clks[apex_i])
     apex_ball_z = round(float(ball_z[apex_i]), 2)
+
+    play_hi = min(len(frames) - 1, i + int(analytics_play_window_frames))
+    min_ball_play = _min_ball_rim_3d_over_index_range(
+        ball_x, ball_y, ball_z, i, play_hi, rim_x, rim_y, RIM_Z
+    )
 
     best_id, best_name, best_dist = None, "", float("inf")
     for pid, (name, tid, _) in player_map.items():
@@ -593,6 +659,7 @@ def _build_row_for_release_index(
         "apex_shot_clock": apex_shot_clock,
         "apex_ball_z": apex_ball_z,
         "min_ball_rim_3d_in": round(min_rim_dist, 2),
+        "min_ball_rim_3d_through_play_in": round(float(min_ball_play), 2),
         "nearest_defender_id": best_id,
         "nearest_defender_name": best_name,
         "contest_distance_ft": round(contest_dist_ft, 3),
@@ -632,6 +699,7 @@ def _rescue_unmatched_pbp_shots(
     lag_min_sec: float,
     lag_max_sec: float,
     preferred_lag_sec: float,
+    analytics_play_window_frames: int,
 ) -> List[dict]:
     """
     Second pass: align unmatched PBP 3PA to tracking using resolution clock + lag window.
@@ -704,6 +772,7 @@ def _rescue_unmatched_pbp_shots(
                 rim_approach_max_in=RESCUE_RIM_APPROACH_MAX_IN,
                 allowed_z_thresholds=z_tiers_rescue,
                 pbp_rescued_flag="yes",
+                analytics_play_window_frames=analytics_play_window_frames,
             )
             if row is None:
                 continue
@@ -733,6 +802,9 @@ def _extract_one_game(
     heave_min_dist_from_rim_in: float,
     min_shot_clock_for_analysis: float,
     desperate_shot_clock_sec: float,
+    analytics_max_shooter_dist_to_rim_in: float,
+    analytics_ball_must_approach_rim_le_in: float,
+    analytics_play_window_frames: int,
 ) -> Tuple[List[dict], set, str]:
     """
     Returns:
@@ -786,6 +858,7 @@ def _extract_one_game(
             rim_approach_max_in=18.0,
             allowed_z_thresholds=(RELEASE_Z_THRESHOLD,),
             pbp_rescued_flag="no",
+            analytics_play_window_frames=analytics_play_window_frames,
         )
         if row is None:
             continue
@@ -797,6 +870,8 @@ def _extract_one_game(
             heave_min_dist_from_rim_in=heave_min_dist_from_rim_in,
             min_shot_clock=min_shot_clock_for_analysis,
             desperate_shot_clock=desperate_shot_clock_sec,
+            analytics_max_shooter_dist_to_rim_in=analytics_max_shooter_dist_to_rim_in,
+            analytics_ball_must_approach_rim_le_in=analytics_ball_must_approach_rim_le_in,
         )
         rows.append(row)
         last_shot_idx = i
@@ -822,6 +897,7 @@ def _extract_one_game(
             lag_min_sec=pbp_rescue_lag_min,
             lag_max_sec=pbp_rescue_lag_max,
             preferred_lag_sec=pbp_rescue_preferred_lag,
+            analytics_play_window_frames=analytics_play_window_frames,
         )
         for row in extra:
             _finalize_row_analysis_columns(
@@ -829,6 +905,8 @@ def _extract_one_game(
                 heave_min_dist_from_rim_in=heave_min_dist_from_rim_in,
                 min_shot_clock=min_shot_clock_for_analysis,
                 desperate_shot_clock=desperate_shot_clock_sec,
+                analytics_max_shooter_dist_to_rim_in=analytics_max_shooter_dist_to_rim_in,
+                analytics_ball_must_approach_rim_le_in=analytics_ball_must_approach_rim_le_in,
             )
             rows.append(row)
 
@@ -841,10 +919,13 @@ def _extract_one_game(
 
 # Reasons mirrored in _finalize_row_analysis_columns()
 HEAVE_AUDIT_REASONS = frozenset({
+    "no_pbp_match",
     "heave_long_distance",
     "shot_clock_below_1s",
     "desperate_shot_clock_le_0p8",
     "pbp_keyword_heave",
+    "shooter_beyond_analytics_arc",
+    "ball_far_from_rim_play_window",
 })
 
 HEAVE_AUDIT_FIELDNAMES = [
@@ -852,6 +933,7 @@ HEAVE_AUDIT_FIELDNAMES = [
     "release_frame", "release_game_clock", "release_shot_clock",
     "shooter_id", "shooter_name",
     "shooter_dist_to_rim_in",
+    "min_ball_rim_3d_through_play_in",
     "pbp_shot_result", "pbp_conclusion_game_clock", "pbp_description",
     "pbp_rescued", "exclusion_reason",
 ]
@@ -929,6 +1011,25 @@ def main() -> None:
         help="Also tag <= this shot-clock value as desperation (logged in exclusion_reason).",
     )
     parser.add_argument(
+        "--analytics-max-shooter-ft-from-rim",
+        type=float,
+        default=40.0,
+        help="analysis_eligible=no if shooter is ≥ this many feet from attacking rim (deep / half-court).",
+    )
+    parser.add_argument(
+        "--analytics-ball-must-get-within-inches-of-rim",
+        type=float,
+        default=54.0,
+        help="analysis_eligible=no if min 3D ball–attacking-rim distance over the post-release window "
+        "never reaches this close (inches); filters pass-like trajectories.",
+    )
+    parser.add_argument(
+        "--analytics-play-window-frames",
+        type=int,
+        default=ANALYTICS_PLAY_WINDOW_FRAMES,
+        help="Frames after release to scan for closest ball–rim approach (default ~6 s @ 60 Hz).",
+    )
+    parser.add_argument(
         "--excluded-heaves-csv", default=None,
         help="Optional path for heave / desperation exclusions audit file "
         "(default: <output-csv basename>_excluded_heaves.csv).",
@@ -954,6 +1055,9 @@ def main() -> None:
     heaves_csv = args.excluded_heaves_csv or f"{base}_excluded_heaves{ext}"
 
     heave_dist_in = float(args.heave_min_ft_from_rim) * 12.0
+    analytics_max_shooter_in = float(args.analytics_max_shooter_ft_from_rim) * 12.0
+    analytics_ball_le_in = float(args.analytics_ball_must_get_within_inches_of_rim)
+    analytics_play_frames = int(args.analytics_play_window_frames)
     rescue_enabled = not args.no_pbp_rescue
 
     pbp_ssl, pbp_ssl_label = _make_pbp_ssl_context(insecure=args.insecure_pbp_ssl)
@@ -989,6 +1093,9 @@ def main() -> None:
             heave_min_dist_from_rim_in=heave_dist_in,
             min_shot_clock_for_analysis=args.min_shot_clock_analysis,
             desperate_shot_clock_sec=args.desperate_shot_clock,
+            analytics_max_shooter_dist_to_rim_in=analytics_max_shooter_in,
+            analytics_ball_must_approach_rim_le_in=analytics_ball_le_in,
+            analytics_play_window_frames=analytics_play_frames,
         )
         matched = sum(1 for r in game_rows if r["pbp_shot_result"] != NA)
         rescued_n = sum(1 for r in game_rows if r.get("pbp_rescued") == "yes")
