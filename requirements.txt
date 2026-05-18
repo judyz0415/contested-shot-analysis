@@ -2,7 +2,7 @@ certifi
 truststore
 pandas
 numpy
-pyarrow
+pyarrow>=16.0.0
 matplotlib
 scipy
 scikit-learn

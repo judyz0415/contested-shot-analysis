@@ -1,5 +1,5 @@
 game_file,game_id,opponent,period,release_frame,release_game_clock,release_shot_clock,shooter_id,shooter_name,shooter_dist_to_rim_in,pbp_shot_result,pbp_conclusion_game_clock,pbp_description,pbp_rescued,exclusion_reason
 nba_game_0022500513_processed.parquet,0022500513,Timberwolves,2,192363,2:09,21,201144,Mike Conley,514.15,NA,NA,NA,no,no_pbp_match;heave_long_distance
-nba_game_0022500553_processed.parquet,0022500553,Thunder,2,202593,0.6,NA,1642349,Ajay Mitchell,669.03,NA,NA,NA,no,no_pbp_match;heave_long_distance
-nba_game_0022501055_processed.parquet,0022501055,Cavaliers,3,270525,5:38,23,203471,Dennis Schroder,769.45,NA,NA,NA,no,no_pbp_match;heave_long_distance
+nba_game_0022500553_processed.parquet,0022500553,Thunder,2,202593,0.6,NA,1642349,Ajay Mitchell,669.03,NA,NA,NA,no,no_pbp_match;heave_long_distance;defender_too_far
+nba_game_0022501055_processed.parquet,0022501055,Cavaliers,3,270525,5:38,23,203471,Dennis Schroder,769.45,NA,NA,NA,no,no_pbp_match;heave_long_distance;defender_too_far
 nba_game_0022501055_processed.parquet,0022501055,Cavaliers,3,290063,4:02,0.7,1628378,Donovan Mitchell,388.41,Made,4:01,D. Mitchell 35' 3PT  (18 PTS) (D. Schröder 3 AST),no,shot_clock_below_1s;desperate_shot_clock_le_0p8

@@ -1,6 +1,7 @@
 .python_packages/
 .venv/
 CLAUDE.md
+.claude/
 
 # Personal working notes (not for the remote repo)
 LOCAL_NOTES.md
