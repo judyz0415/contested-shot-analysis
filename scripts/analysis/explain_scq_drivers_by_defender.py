@@ -6,7 +6,7 @@ SCQ formula from build_unified_shot_dataset.py:
   SCQ = 100 * (
       0.35 * max(0, 1 - contest_distance_ft / 10)
     + 0.30 * clip(closeout_speed_ft_s / 8, 0, 1)
-    + 0.20 * max(0, 1 - contest_angle_deg / 90)
+    + 0.20 * clip((contest_angle_deg - 90) / 90, 0, 1)
     + 0.15 * clip(hand_up_in / 18, 0, 1)
   )
 
@@ -43,7 +43,7 @@ def _clip01(x: float) -> float:
 def _scq_components(dist_ft: float, speed_ft_s: float, angle_deg: float, hand_in: float) -> Dict[str, float]:
     d_norm = max(0.0, 1.0 - dist_ft / 10.0)
     s_norm = _clip01(speed_ft_s / 8.0)
-    a_norm = max(0.0, 1.0 - angle_deg / 90.0)
+    a_norm = _clip01((angle_deg - 90.0) / 90.0)
     h_norm = _clip01(hand_in / 18.0)
     return {
         "distance_pts": 100.0 * 0.35 * d_norm,

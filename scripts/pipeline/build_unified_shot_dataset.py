@@ -382,11 +382,18 @@ def _angle_deg(ax: float, ay: float, bx: float, by: float) -> float:
 
 
 def _contest_quality(dist_ft: float, speed_ft_s: float, angle_deg: float, hand_in: float) -> float:
-    """Heuristic 0-100 SCQ score. Weights are a starting point, not validated."""
+    """Heuristic 0-100 SCQ score. Weights are a starting point, not validated.
+
+    Angle component: rewards defenders who are *in front* of the shooter.
+      90°  → 0.0  (just barely in front, at the shooter's shoulder)
+      180° → 1.0  (directly facing the shooter, full face-guard)
+    Previous formula (1 - angle/90) was inverted: it gave credit for being
+    *behind* the shooter and zeroed out for all eligible (≥90°) contests.
+    """
     return round(100.0 * (
         0.35 * max(0.0, 1.0 - dist_ft / 10.0)
       + 0.30 * max(0.0, min(1.0, speed_ft_s / 8.0))
-      + 0.20 * max(0.0, 1.0 - angle_deg / 90.0)
+      + 0.20 * max(0.0, min(1.0, (angle_deg - 90.0) / 90.0))
       + 0.15 * max(0.0, min(1.0, hand_in / 18.0))
     ), 2)
 
