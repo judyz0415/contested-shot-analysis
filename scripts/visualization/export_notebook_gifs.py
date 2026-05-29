@@ -140,23 +140,23 @@ def focus_on_half_court(fig: go.Figure, rim_x: float) -> go.Figure:
     fig = copy.deepcopy(fig)
 
     if rim_x > 0:
-        # Corner three-pointers reach x≈290, y≈±220; give enough buffer
-        x_range = [100, 620]
-        eye    = dict(x=-1.1, y=1.05, z=0.8)
-        center = dict(x=0.2,  y=0.0,  z=-0.05)
+        # Players can reach x≈620+, y≈-220 in the corner; give generous buffer
+        x_range = [50, 720]
+        eye    = dict(x=-1.05, y=1.05, z=0.8)
+        center = dict(x=0.2,   y=0.0,  z=-0.05)
     else:
-        x_range = [-620, -100]
-        eye    = dict(x=1.1,  y=1.05, z=0.8)
-        center = dict(x=-0.2, y=0.0,  z=-0.05)
+        x_range = [-720, -50]
+        eye    = dict(x=1.05,  y=1.05, z=0.8)
+        center = dict(x=-0.2,  y=0.0,  z=-0.05)
 
     fig.update_layout(
         scene=dict(
             xaxis=dict(range=x_range, title="X"),
-            yaxis=dict(range=[-270, 270], title="Y"),  # wide enough for corners
+            yaxis=dict(range=[-310, 310], title="Y"),  # full corner buffer
             zaxis=dict(range=[0, 230],    title="Z"),
             camera=dict(eye=eye, center=center, up=dict(x=0, y=0, z=1)),
             aspectmode="manual",
-            aspectratio=dict(x=1.0, y=1.05, z=0.42),
+            aspectratio=dict(x=1.0, y=1.05, z=0.40),
         )
     )
     return fig
