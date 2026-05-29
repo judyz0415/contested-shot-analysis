@@ -39,7 +39,7 @@ PARQUET_DIR = (
     "[MIT] Basketball Officiating - miami_heat_2025"
 )
 PRE_FRAMES  = 60
-POST_FRAMES = 4
+POST_FRAMES = 64   # ~1 s post-release at 60 fps to show full shot motion
 PARQUET_GAME_CACHE: dict = {}
 
 OUT_DIR = REPO / "report" / "assets"
@@ -174,7 +174,15 @@ def export_gif(row: pd.Series, out_path: Path, label: str):
         court_png_half=None,
         parquet_game_df_cache=PARQUET_GAME_CACHE,
     )
-    fig = assets["fig_plotly_pre_release"]   # 61 frames; fig_plotly_window has 961
+    # fig_plotly_pre_release = PRE_FRAMES+1 frames (up to release).
+    # fig_plotly_window = fixed large window (961 frames). Slice it to
+    # PRE_FRAMES + POST_FRAMES + 1 so we capture the full release motion
+    # without rendering hundreds of unnecessary frames.
+    fig_window = assets["fig_plotly_window"]
+    n_want = PRE_FRAMES + POST_FRAMES + 1          # e.g. 60+64+1 = 125
+    fig = copy.deepcopy(fig_window)
+    fig.frames = fig.frames[:n_want]
+    print(f"  using {len(fig.frames)} frames from fig_plotly_window (of {len(fig_window.frames)})")
 
     # Zoom into the relevant half-court so rim is always visible
     rim_x = float(row.get("rim_x", 516))
