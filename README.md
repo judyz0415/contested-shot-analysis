@@ -108,7 +108,7 @@ Mitchell was 3.0 ft from Rollins at release — 2.8 ft closer than the pool aver
 
 ### Worst SCQ — Norman Powell on Myles Turner (SCQ 23.8 · Made)
 
-Powell is nearly 7 ft away (1.1 ft beyond pool average), moving at 0.4 ft/s (8.1 ft/s below average — essentially stationary), with his hand 33 inches *below* the ball at release. Turner's angle advantage (−24.9°) confirms he's partially behind the shooter. Every metric is red. The shot went in.
+Powell is nearly 7 ft away (1.1 ft beyond pool average), moving at 0.4 ft/s (8.1 ft/s below average — essentially stationary), with his hand 33 inches *below* the ball at release. Turner's angle advantage (−24.9°) confirms defensive displacement. Every metric is red. The shot went in.
 
 ![Metric card — Worst SCQ](report/assets/metric_card_worst_scq.png)
 
