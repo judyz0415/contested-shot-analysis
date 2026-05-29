@@ -92,6 +92,29 @@ Ridge logistic regression implemented from scratch in pure Python with gradient 
 The defender jump feature captures a pump-fake artifact: positive values indicate the defender left the floor before release, often in response to a shot fake.
 
 ---
+## Metric Alignment: Do the Numbers Match What We See?
+
+The two shots below anchor either end of the SCQ distribution — the single best and worst contest in the 310-shot eligible pool. Each bar chart shows how that shot's contest metrics compare to the pool average (green = better for defense, red = worse). The GIF shows the 3D player/ball positions in the ~1 second before release.
+
+### Best SCQ — Davion Mitchell on Ryan Rollins (SCQ 86.4 · Missed)
+
+Mitchell was 3.0 ft from Rollins at release — 2.8 ft closer than the pool average — directly in front (+10.3° above average angle), with his hand 11.2 inches higher above the ball than a typical contest. The shot missed. The height and wingspan numbers are slightly red because Rollins is taller, but every positioning and technique metric is green.
+
+![Metric card — Best SCQ](report/assets/metric_card_best_scq.png)
+
+![Pre-release animation — Best SCQ](report/assets/pre_release_best_scq.gif)
+
+---
+
+### Worst SCQ — Norman Powell on Myles Turner (SCQ 23.8 · Made)
+
+Powell is nearly 7 ft away (1.1 ft beyond pool average), moving at 0.4 ft/s (8.1 ft/s below average — essentially stationary), with his hand 33 inches *below* the ball at release. Turner's angle advantage (−24.9°) confirms he's partially behind the shooter. Every metric is red. The shot went in.
+
+![Metric card — Worst SCQ](report/assets/metric_card_worst_scq.png)
+
+![Pre-release animation — Worst SCQ](report/assets/pre_release_worst_scq.gif)
+
+---
 
 ## Results
 
