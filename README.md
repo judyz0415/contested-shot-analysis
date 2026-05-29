@@ -1,10 +1,10 @@
 # Contesting the Three: A Hawk-Eye Analysis of Perimeter Defense
 
-**Judy Zhu** · MIT 15.285 Sports Analytics · 2025–26 NBA Season
+MIT 15.285 Sports Analytics · 2025–26 NBA Season
 
 ---
 
-> *"One Heat defender allowed opponents to make only 20.8% of their three-point attempts — nearly 15 percentage points below league average. His box-score metrics ranked him last on his own team's perimeter defense leaderboard. The tracking data tells a different story."*
+> *"One Heat defender allowed opponents to make only 20.8% of their three-point attempts, whcih is nearly 15 percentage points below league average. His box-score metrics ranked him last on his own team's perimeter defense leaderboard. However, the tracking data tells a different story."*
 
 ---
 
