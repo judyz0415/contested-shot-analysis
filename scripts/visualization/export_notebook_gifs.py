@@ -140,23 +140,23 @@ def focus_on_half_court(fig: go.Figure, rim_x: float) -> go.Figure:
     fig = copy.deepcopy(fig)
 
     if rim_x > 0:
-        x_range = [50, 620]
-        # Camera sits to the left of the right half, slightly elevated
-        eye    = dict(x=-1.6, y=1.4, z=0.9)
-        center = dict(x=0.3,  y=0.0, z=-0.1)
+        x_range = [200, 620]   # tighter: only the scoring half
+        # Camera pulled closer and angled toward the key/rim area
+        eye    = dict(x=-1.2, y=1.1, z=0.75)
+        center = dict(x=0.25, y=0.0, z=-0.05)
     else:
-        x_range = [-620, -50]
-        eye    = dict(x=1.6,  y=1.4, z=0.9)
-        center = dict(x=-0.3, y=0.0, z=-0.1)
+        x_range = [-620, -200]
+        eye    = dict(x=1.2,  y=1.1, z=0.75)
+        center = dict(x=-0.25, y=0.0, z=-0.05)
 
     fig.update_layout(
         scene=dict(
             xaxis=dict(range=x_range, title="X"),
-            yaxis=dict(range=[-320, 320], title="Y"),
-            zaxis=dict(range=[0, 260],    title="Z"),
+            yaxis=dict(range=[-230, 230], title="Y"),  # tighter sideline crop
+            zaxis=dict(range=[0, 220],    title="Z"),
             camera=dict(eye=eye, center=center, up=dict(x=0, y=0, z=1)),
             aspectmode="manual",
-            aspectratio=dict(x=1.0, y=0.9, z=0.4),
+            aspectratio=dict(x=1.0, y=1.1, z=0.45),
         )
     )
     return fig
