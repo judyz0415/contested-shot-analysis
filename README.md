@@ -22,7 +22,7 @@ The core problem: conventional metrics conflate **contesting a shot** with **def
 
 ### 1. Size predicts shot suppression more than speed
 
-I built a ridge logistic regression model using both shot-mechanics features (contest distance, closeout speed, angle, hand height) and physical matchup features derived from tracking (effective contest height, height differential, wingspan advantage).
+We built a ridge logistic regression model using both shot-mechanics features (contest distance, closeout speed, angle, hand height) and physical matchup features derived from tracking (effective contest height, height differential, wingspan advantage).
 
 The single strongest predictor of a three-pointer going in is how far **below** the ball the defender's hand is at the release frame. Each standard deviation of hand clearance above the ball reduces make probability by ~12%. Height difference (defender − shooter) is the second-strongest feature, nearly tied.
 
@@ -30,17 +30,17 @@ Closeout speed — the metric most visible on film — is statistically indistin
 
 ### 2. The best-looking defender and the best-performing defender are different people
 
+In our limited sample of 15 games:
+
 **Dru Smith** ranks #1 in Shot Contest Quality (SCQ). He closes out faster than anyone on the roster. He also has the **worst contest angle on the team** — he arrives from the side, not in front.
 
-**Bam Adebayo** ranks #12 in SCQ because the speed component penalizes him for never being out of position. He allowed opponents to make **20.8% of three-point attempts** against his contests — a lift of −20.5 percentage points below what shooter quality and shot difficulty predicted. Best suppression number on the team by a wide margin.
+**Bam Adebayo** ranks #12 in SCQ because the speed component penalizes him for never being out of position. He allowed opponents to make **20.8% of three-point attempts** against his contests — a lift of −20.5 percentage points below what shooter quality and shot difficulty predicted. Best suppression number on the team by a wide margin.   
 
-The defenders generating the most visible, athletic-looking contests are associated with *more* makes than expected. The defenders who show up quietly and correctly are suppressing shots.
+Two confounds are worth naming. Bam's opponents skew toward opposing bigs stepping out to shoot — lower-skill three-point shooters whose season averages may slightly overstate their true threat level in that specific shot type, which could inflate his lift number. Smith, conversely, is a young guard being schemed against in switch situations — the baseline controls for shooter quality but not for how clean the catch was or whether a screen still had him recovering, meaning his +6.9 pp may reflect assignment difficulty as much as contest quality. Both effects point in the same direction: *15 games is enough to surface a pattern, not enough to rule out noise.* The physical model does independently explain part of Bam's outcomes: his hand clearance and height advantage over the shooters he guards show up as the strongest predictors in the regression, which gives the directional story more support than lift alone would.
 
 ### 3. There are two defensive profiles, and they rank in opposite order depending on what you value
 
-A sensitivity analysis across five SCQ weighting schemes reveals a fundamental split. Under speed-heavy weights, closers like Smith and Jakucionis lead. Under technique-heavy weights (angle + hand), stationed defenders like Kel'el Ware, Adebayo, and Andrew Wiggins lead. The Spearman correlation between the two extremes is **−0.46** — the rankings essentially invert.
-
-This is not metric fragility. It surfaces a real philosophical question about what perimeter defense looks like, with direct implications for how teams evaluate free agent wings.
+A sensitivity analysis across five SCQ weighting schemes reveals a fundamental split. Under speed-heavy weights, closers like Smith and Jakucionis lead. Under technique-heavy weights (angle + hand), stationed defenders like Kel'el Ware, Adebayo, and Andrew Wiggins lead. The Spearman correlation between the two extremes is **−0.46** — the rankings essentially invert. This reveals what perimeter defense actually looks like, with direct implications for how teams evaluate free agent wings.
 
 ---
 
@@ -220,10 +220,4 @@ python scripts/analysis/scq_lift_correlation.py
 
 ## About
 
-Developed for **MIT 15.285 (Analytics Insights)** using Hawk-Eye data provided through the course. Built as a demonstration of applied sports analytics: constructing production-grade pipelines on raw tracking data, asking basketball-first questions about what the data can actually answer, and communicating findings to both technical and non-technical audiences.
-
-**Full write-up:** [`report/heat_perimeter_defense_report.md`](report/heat_perimeter_defense_report.md)
-
----
-
-*Judy Zhu · judy.zhu6052@gmail.com*
+Developed for **MIT 15.285 (Sports Analytics)** using Hawk-Eye data provided through the course. Built as a demonstration of applied sports analytics: constructing production-grade pipelines on raw tracking data, asking basketball-first questions about what the data can actually answer, and communicating findings to both technical and non-technical audiences.
