@@ -10,7 +10,7 @@ MIT 15.285 Sports Analytics · 2025–26 NBA Season
 
 ## What This Project Does
 
-This project builds a full analytics pipeline on top of **Hawk-Eye optical tracking data** — the 60-frames-per-second positional system used by the NBA — to measure *how* Miami Heat defenders contest three-point shots, not just *that* they do.
+This project builds a full analytics pipeline on top of **Hawk-Eye optical tracking data** — the 60-frames-per-second positional system used by the NBA — to measure *how* Miami Heat defenders contest three-point shots, not just that they do.
 
 The core problem: conventional metrics conflate **contesting a shot** with **defending a shot well**. A defender sprinting full-speed toward a shooter from 15 feet looks like effort. So does a defender pump-faked into the air while a shooter releases. Neither is good defense. Box scores and basic tracking stats can't separate them. Hawk-Eye can.
 
@@ -22,7 +22,7 @@ The core problem: conventional metrics conflate **contesting a shot** with **def
 
 ### 1. Tracking puts numbers on what film can only show
 
-Film tells you *that* a defender was there. Hawk-Eye tells you exactly how far they were at the release frame (to the tenth of a foot), how fast they arrived, what angle they came from relative to the rim, and how high their hand was above the ball at the exact moment the shot left the shooter's fingertips. Those are four separate, measurable levers — and for the first time, they can each be benchmarked, compared across a roster, and coached in specific terms.
+Film tells you that a defender was there. Hawk-Eye tells you exactly how far they were at the release frame (to the tenth of a foot), how fast they arrived, what angle they came from relative to the rim, and how high their hand was above the ball at the exact moment the shot left the shooter's fingertips. Those are four separate, measurable levers — and for the first time, they can each be benchmarked, compared across a roster, and coached in specific terms.
 
 Consider Bam Adebayo. On film and in the box score, his perimeter defense reads as passive: low closeout speed, rarely the defender making a dramatic last-second sprint. Tracking tells a different story. At the release frame, his hand is 44.6 inches above his body centroid — one of the highest elevations recorded on the team. His approach angle puts him between the shooter and the rim, not scrambling from the side. His distance at release is elite. The film doesn't easily reveal any of this. The data does.
 
