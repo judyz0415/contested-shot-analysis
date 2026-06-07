@@ -4,7 +4,7 @@ MIT 15.285 Sports Analytics · 2025–26 NBA Season
 
 ---
 
-> *"One Heat defender allowed opponents to make only 20.8% of their three-point attempts, whcih is nearly 15 percentage points below league average. His box-score metrics ranked him last on his own team's perimeter defense leaderboard. However, the tracking data tells a different story."*
+> *"One Heat defender allowed opponents to make only 20.8% of their three-point attempts, which is nearly 15 percentage points below league average. His box-score metrics ranked him last on his own team's perimeter defense leaderboard. However, the tracking data tells a different story."*
 
 ---
 
@@ -20,27 +20,36 @@ The core problem: conventional metrics conflate **contesting a shot** with **def
 
 ## Three Findings Worth Knowing
 
-### 1. Size predicts shot suppression more than speed
+### 1. Tracking puts numbers on what film can only show
 
-We built a ridge logistic regression model using both shot-mechanics features (contest distance, closeout speed, angle, hand height) and physical matchup features derived from tracking (effective contest height, height differential, wingspan advantage).
+Film tells you *that* a defender was there. Hawk-Eye tells you exactly how far they were at the release frame (to the tenth of a foot), how fast they arrived, what angle they came from relative to the rim, and how high their hand was above the ball at the exact moment the shot left the shooter's fingertips. Those are four separate, measurable levers — and for the first time, they can each be benchmarked, compared across a roster, and coached in specific terms.
 
-The single strongest predictor of a three-pointer going in is how far **below** the ball the defender's hand is at the release frame. Each standard deviation of hand clearance above the ball reduces make probability by ~12%. Height difference (defender − shooter) is the second-strongest feature, nearly tied.
+Consider Bam Adebayo. On film and in the box score, his perimeter defense reads as passive: low closeout speed, rarely the defender making a dramatic last-second sprint. Tracking tells a different story. At the release frame, his hand is 44.6 inches above his body centroid — one of the highest elevations recorded on the team. His approach angle puts him between the shooter and the rim, not scrambling from the side. His distance at release is elite. The film doesn't easily reveal any of this. The data does.
 
-Closeout speed — the metric most visible on film — is statistically indistinguishable from noise once physical features are controlled for.
+That's the core value of this pipeline: it translates defensive instinct into a fingerprint — one that can be compared across defenders, tracked over a season, and used as the basis for targeted skill development.
 
-### 2. The best-looking defender and the best-performing defender are different people
+### 2. Low closeout speed is the wrong red flag — and Bam proves it
 
-In our limited sample of 15 games:
+Closeout speed is the most visible kinematic signal in film review. A defender sprinting full-speed reads as effort; one who isn't sprinting reads as passive. That visual shortcut is misleading, and Bam Adebayo is the clearest illustration of why.
 
-**Dru Smith** ranks #1 in Shot Contest Quality (SCQ). He closes out faster than anyone on the roster. He also has the **worst contest angle on the team** — he arrives from the side, not in front.
+Bam has the **lowest average closeout speed** on the Heat's perimeter defense roster. He also allowed opponents to make only **20.8% of their three-point attempts** against his contests — a lift of −20.5 percentage points below what shooter quality and shot difficulty predicted. Best suppression number on the team by a wide margin.
 
-**Bam Adebayo** ranks #12 in SCQ because the speed component penalizes him for never being out of position. He allowed opponents to make **20.8% of three-point attempts** against his contests — a lift of −20.5 percentage points below what shooter quality and shot difficulty predicted. Best suppression number on the team by a wide margin.   
+Tracking resolves the apparent contradiction. Bam's low speed is a signal of *positioning*, not passivity: he was already in range before the shot was set, so he didn't need to sprint. The measurement that matters isn't how fast he got there — it's where he was at the moment of release. His hand elevation and physical reach advantage over shooters are among the highest on the roster. The physical model confirms it: height differential and hand elevation at release are the two strongest predictors of shot suppression in the sample.
 
-Two confounds are worth naming. Bam's opponents skew toward opposing bigs stepping out to shoot — lower-skill three-point shooters whose season averages may slightly overstate their true threat level in that specific shot type, which could inflate his lift number. Smith, conversely, is a young guard being schemed against in switch situations — the baseline controls for shooter quality but not for how clean the catch was or whether a screen still had him recovering, meaning his +6.9 pp may reflect assignment difficulty as much as contest quality. Both effects point in the same direction: *15 games is enough to surface a pattern, not enough to rule out noise.* The physical model does independently explain part of Bam's outcomes: his hand clearance and height advantage over the shooters he guards show up as the strongest predictors in the regression, which gives the directional story more support than lift alone would.
+Closeout speed, by contrast, is statistically indistinguishable from noise in the outcome model once position and physical features are controlled for.
 
-### 3. There are two defensive profiles, and they rank in opposite order depending on what you value
+### 3. Component-level measurement makes defense teachable
 
-A sensitivity analysis across five SCQ weighting schemes reveals a fundamental split. Under speed-heavy weights, closers like Smith and Jakucionis lead. Under technique-heavy weights (angle + hand), stationed defenders like Kel'el Ware, Adebayo, and Andrew Wiggins lead. The Spearman correlation between the two extremes is **−0.46** — the rankings essentially invert. This reveals what perimeter defense actually looks like, with direct implications for how teams evaluate free agent wings.
+Before tracking, perimeter defense feedback was categorical: you were there or you weren't. What component measurement enables is feedback on four distinct levers — each independently measurable, each independently coachable:
+
+- **Distance at release** — how close the defender was when the ball left the shooter's hand, regardless of how they got there
+- **Closeout speed** — how urgently they closed from their starting position
+- **Approach angle** — whether they arrived between the shooter and the rim or from the side
+- **Hand elevation above the ball** — the physical disruption of the shooting lane at the moment of release
+
+Because each of these is now a number, coaching becomes specific. Instead of "contest harder," a coach can say: "your approach angle on drive-and-kick situations is 23° off-center — fourth-worst on the roster" or "your hand is 8 inches below the pool average at release." That specificity is what separates a general correction from a repeatable skill adjustment.
+
+It also separates defenders into honest archetypes. A closer who arrives fast from distance is executing a fundamentally different strategy than a positioned defender who was already there — both can be effective, and both can be coached on the specific dimension where they lose ground. A sensitivity analysis across five SCQ weighting schemes makes this split visible: the Spearman correlation between speed-heavy and technique-heavy rankings is **−0.46**, meaning the roster essentially sorts into two non-overlapping defensive profiles depending on which dimension you prioritize. That's not a flaw in the metric — it's the data revealing that perimeter defense isn't one skill.
 
 ---
 
@@ -119,6 +128,8 @@ Powell is nearly 7 ft away (1.1 ft beyond pool average), moving at 0.4 ft/s (8.1
 ## Results
 
 ### Per-Defender SCQ Rankings
+
+SCQ measures **contest process** — how urgently and correctly a defender executed the closeout. It is a diagnostic tool for coaching, not a ranking of defensive outcomes. A stationed defender like Adebayo will always score lower on the speed component than a scrambling closer, because he arrived in position before the play developed and didn't need to sprint. Read the SCQ columns as "what did this defender's technique look like at release?" and the lift column as "what did it produce?"
 
 | # | Defender | Shots | SCQ | Speed | Angle | Hand | Lift vs. Baseline |
 |---|----------|-------|-----|-------|-------|------|-------------------|
