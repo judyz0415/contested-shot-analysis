@@ -1,0 +1,6 @@
+feature,VIF
+def_hand_elev_above_ball_in,1.031
+arm_extension_ratio,1.121
+trunk_lean_deg,1.095
+lateral_velocity_ft_s,1.099
+min_def_joint_dist_ft,1.08

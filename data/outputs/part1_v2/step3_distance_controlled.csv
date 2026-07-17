@@ -1,0 +1,8 @@
+feature,log_OR,OR,ci_lower,ci_upper,p_value
+def_hand_elev_above_ball_in,-0.164,0.8488,0.5269,1.3555,0.4964
+arm_extension_ratio,-0.0818,0.9215,0.6824,1.2489,0.5958
+trunk_lean_deg,0.1353,1.1449,0.898,1.5266,0.3175
+lateral_velocity_ft_s,0.1566,1.1696,0.9081,1.4956,0.2184
+min_def_joint_dist_ft,-0.0822,0.921,0.6882,1.1627,0.5387
+pre_shot_distance_ft,-0.0793,0.9238,0.7133,1.2644,0.5871
+defender_jump_in,0.1969,1.2176,0.8041,1.7727,0.3289

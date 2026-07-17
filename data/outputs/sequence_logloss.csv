@@ -1,0 +1,5 @@
+model,oof_logloss
+intercept-only,1.2178
+Snapshot-MNL,1.1918
+Sequence-MNL,1.1908
+Sequence-GBM,1.4364

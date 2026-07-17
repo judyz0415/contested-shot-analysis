@@ -1,0 +1,6 @@
+test,metric,value
+Logistic (all features),5-fold CV AUC,0.515
+XGBoost (all features),5-fold CV AUC,0.533
+Logistic (distance only),5-fold CV AUC,0.541
+Full pose set vs distance-only,LRT p,0.733
+"Defender identity (LRT, contested n=304)",LRT p,0.1623

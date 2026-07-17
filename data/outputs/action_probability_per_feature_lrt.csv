@@ -1,0 +1,6 @@
+pose_feature,lr_stat,df,p_value
+def_hand_elev_above_ball_in,21.134,4,0.000298
+arm_extension_ratio,36.163,4,0.0
+trunk_lean_deg,44.809,4,0.0
+lateral_velocity_ft_s,123.557,4,0.0
+min_def_joint_dist_ft,207.001,4,0.0

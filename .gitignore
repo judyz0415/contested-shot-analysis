@@ -2,17 +2,20 @@
 .venv/
 CLAUDE.md
 .claude/
+.DS_Store
 
-# Personal working notes (not for the remote repo)
+# Personal working notes
 LOCAL_NOTES.md
 
-# Pipeline outputs and archived extracts — do not commit.
-# Covers all of data/outputs/ including PNG/HTML viz, shot_sequences/runs/, datasets/, summaries, diagnostics, modeling artifacts.
-data/outputs/
-data/archive/
+# Raw Hawk-Eye parquets (too large for git, stored externally)
+data/parquets/
+*.parquet
 
-# Large upstream extract (exceeds GitHub file size limit).
+# Raw and intermediate datasets (proprietary / too large — keep local)
+data/intermediate/
+data/pbp_raw/
 data/PlayerStatistics.csv
+data/player_height_wingspan.csv
 
 # Python bytecode
 __pycache__/
